@@ -4,4 +4,8 @@
         jarohen/chime {:mvn/version "0.3.2"}}
  :aliases {:nREPL
            {:extra-deps
-            {nrepl/nrepl {:mvn/version "0.7.0"}}}}}
+            {nrepl/nrepl {:mvn/version "0.7.0"}}}
+           :uberjar
+           {:extra-deps
+            {seancorfield/depstar {:mvn/version "1.0.94"}}
+            :main-opts ["-m" "hf.depstar.uberjar"]}}}

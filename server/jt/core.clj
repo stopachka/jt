@@ -1,4 +1,5 @@
 (ns jt.core
+  (:gen-class)
   (:require [mailgun.mail :as mail]
             [mailgun.util :refer [to-file]]
             [chime.core :as chime-core])
@@ -71,15 +72,5 @@
             send-reminders))
   (future (chime-core/chime-at
             (summary-period)
-            send-summaries)))
-
-;; repl
-
-(comment
-  (def res (send-mail {:from (str "journal-buddy@journaltogether.com")
-                       :to "markshlick@gmail.com"
-                       :cc "stepan.p@gmail.com"
-                       :subject "heyhey!"
-                       :html "how's your day?"}))
-  (def w (run-worker {:duration 1000 :fn #(println "hello world!")}))
-  (def f (firebase-init)))
+            send-summaries))
+  (println "started!"))
