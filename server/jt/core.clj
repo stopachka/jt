@@ -9,7 +9,7 @@
             [clojure.edn :as edn])
   (:import (com.google.firebase FirebaseApp FirebaseOptions$Builder)
            (com.google.auth.oauth2 ServiceAccountCredentials)
-           (java.time LocalTime ZonedDateTime ZoneId Period)
+           (java.time LocalTime ZonedDateTime ZoneId Period Instant)
            (java.io PushbackReader)))
 
 ;; Secrets
@@ -65,13 +65,22 @@
                      (ZoneId/of "America/Los_Angeles")))
       .toInstant))
 
+(defn daily-period [inst]
+  (chime-core/periodic-seq inst (Period/ofDays 1)))
+
+(defn after-now [period]
+  (let [now (Instant/now)]
+    (filter #(.isAfter % now) period)))
+
 (defn reminder-period []
-  (chime-core/periodic-seq (pst-instant 16 0 0) (Period/ofDays 1)))
+  (-> (pst-instant 13 15 0)
+      daily-period
+      after-now))
 
 (defn summary-period []
-  (chime-core/periodic-seq
-    (pst-instant 9 0 0)
-    (Period/ofDays 1)))
+  (-> (pst-instant 9 0 0)
+      daily-period
+      after-now))
 
 ;; Reminders & Summaries
 

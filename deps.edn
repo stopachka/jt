@@ -3,9 +3,9 @@
         com.google.firebase/firebase-admin {:mvn/version "6.14.0"}
         jarohen/chime {:mvn/version "0.3.2"}
         io.aviso/logging {:mvn/version "0.3.2"}}
+ :jvm-opts ["-Dclojure.server.repl=\"{:port 5555 :accept clojure.core.server/repl}\""]
  :aliases {:nREPL
-           {:jvm-opts ["-Dclojure.tools.logging.factory=clojure.tools.logging.impl/slf4j-factory"]
-            :extra-deps
+           {:extra-deps
             {nrepl/nrepl {:mvn/version "0.7.0"}}}
            :uberjar
            {:extra-deps
