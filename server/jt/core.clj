@@ -106,26 +106,35 @@
   (-> (DateTimeFormatter/ofPattern "EEEE")
       (.format zoned-date)))
 
-(defn content-hows-your-day? [now]
+(defn content-hows-your-day? [day]
   {:from "Journal Buddy <journal-buddy@journaltogether.com>"
    :to ["stepan.p@gmail.com"]
-   :subject (str (pretty-date now) " — 👋 How was your day?")
+   :subject (str (pretty-date day) " — 👋 How was your day?")
    :html
    (str "<p>"
-        "Howdy, Happy " (pretty-day-of-week now)
+        "Howdy, Happy " (pretty-day-of-week day)
         "</p>"
         "<p>"
         "How was your day today? What's been on your mind? 😊 📝"
+        "</p>")})
+
+(defn content-summary [day]
+  {:from "Journal Buddy <journal-buddy@journaltogether.com>"
+   :to ["stepan.p@gmail.com"]
+   :subject (str "☀️ Here's how things went " (pretty-date day))
+   :html
+   (str "<p>"
+        "Howdy, Here's how things have went:"
+        "</p>"
+        "<p>"
+        "Coming soon : }"
         "</p>")})
 
 (defn send-reminders [_]
   (send-mail (content-hows-your-day? (pst-now))))
 
 (defn send-summaries [_]
-  (send-mail {:from "Journal Buddy <journal-buddy@journaltogether.com>"
-              :to ["stepan.p@gmail.com"]
-              :subject "This is a summary email"
-              :html "Coming soon!"}))
+  (send-mail (content-summary (.minusDays (pst-now) 1))))
 
 ;; HTTP Server
 
