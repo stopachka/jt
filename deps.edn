@@ -2,9 +2,10 @@
  :deps {nilenso/mailgun {:mvn/version "0.2.3"}
         com.google.firebase/firebase-admin {:mvn/version "6.14.0"}
         jarohen/chime {:mvn/version "0.3.2"}
-        org.clojure/tools.logging {:mvn/version "1.1.0"}}
+        io.aviso/logging {:mvn/version "0.3.2"}}
  :aliases {:nREPL
-           {:extra-deps
+           {:jvm-opts ["-Dclojure.tools.logging.factory=clojure.tools.logging.impl/slf4j-factory"]
+            :extra-deps
             {nrepl/nrepl {:mvn/version "0.7.0"}}}
            :uberjar
            {:extra-deps

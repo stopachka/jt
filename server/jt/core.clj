@@ -1,6 +1,8 @@
 (ns jt.core
   (:gen-class)
-  (:require [mailgun.mail :as mail]
+  (:require [io.aviso.logging.setup]
+            [clojure.tools.logging :as log]
+            [mailgun.mail :as mail]
             [mailgun.util :refer [to-file]]
             [chime.core :as chime-core]
             [clojure.java.io :as io]
@@ -79,11 +81,11 @@
    :subject subject
    :html "will do nothing with a reply 4 now"})
 
-(defn send-reminders []
-  (send-mail (test-email "how was your day? (this is a reminder)")))
+(defn send-reminders [_]
+  (log/infof (pr-str (test-email "how was your day? (this is a reminder)"))))
 
-(defn send-summaries []
-  (send-mail (test-email "this is a summary email")))
+(defn send-summaries [_]
+  (log/infof (pr-str (test-email "this is a summary email"))))
 
 (defn -main []
   (future (chime-core/chime-at
@@ -92,4 +94,4 @@
   (future (chime-core/chime-at
             (summary-period)
             send-summaries))
-  (println "started!"))
+  (log/info "started!"))
