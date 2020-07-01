@@ -97,6 +97,7 @@
   (log/infof (pr-str (test-email "this is a summary email"))))
 
 (defn -main []
+  (firebase-init)
   (future (chime-core/chime-at
             (reminder-period)
             send-reminders))
