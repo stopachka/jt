@@ -2,6 +2,6 @@
 .idea
 .cpcache
 jt.iml
-jt-*.jar
+jt.jar
 secrets
 pom.xml

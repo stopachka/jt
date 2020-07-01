@@ -31,7 +31,6 @@
 
 (def config
   {:port 8080
-   :root-domain "journaltogether.com"
    :mailgun {:domain "mg.journaltogether.com"}
    :firebase {:db-url "https://journaltogether.firebaseio.com"}})
 
@@ -107,7 +106,7 @@
       (.format zoned-date)))
 
 (defn content-hows-your-day? [day]
-  {:from "Journal Buddy <journal-buddy@journaltogether.com>"
+  {:from "Journal Buddy <journal-buddy@mg.journaltogether.com>"
    :to ["stepan.p@gmail.com"]
    :subject (str (pretty-date day) " — 👋 How was your day?")
    :html
@@ -119,7 +118,7 @@
         "</p>")})
 
 (defn content-summary [day]
-  {:from "Journal Buddy <journal-buddy@journaltogether.com>"
+  {:from "Journal Buddy <journal-buddy@mg.journaltogether.com>"
    :to ["stepan.p@gmail.com"]
    :subject (str "☀️ Here's how things went " (pretty-date day))
    :html
@@ -138,13 +137,15 @@
 
 ;; HTTP Server
 
-(defn ping-handler [_]
+(def _req (atom nil))
+(defn emails-handler [req]
+  (reset! _req (atom req))
   (response {:message "🏓 pong!"}))
 
 (defroutes routes
            ;; ---
            ;; api
-           (POST "/api/ping" [] ping-handler))
+           (POST "/api/emails" [] emails-handler))
 
 (defn -main []
   (firebase-init)
