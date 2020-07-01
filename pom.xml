@@ -26,6 +26,11 @@
       <artifactId>chime</artifactId>
       <version>0.3.2</version>
     </dependency>
+    <dependency>
+      <groupId>io.aviso</groupId>
+      <artifactId>logging</artifactId>
+      <version>0.3.2</version>
+    </dependency>
   </dependencies>
   <build>
     <sourceDirectory>server</sourceDirectory>

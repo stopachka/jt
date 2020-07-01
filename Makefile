@@ -5,8 +5,8 @@ GC_BUCKET="jt-builds"
 GC_VM_NAME="jt-1"
 GC_VM_ZONE="us-central1-a"
 
-dev-nrepl:
-	clj -R:nREPL -m nrepl.cmdline -p 3434 -i
+dev-repl:
+	clj -A:socket
 
 prod-build-jar:
 	clojure -Spom && clojure -A:uberjar $(JAR_NAME) -C -m $(CORE_CLASS)

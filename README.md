@@ -1,7 +1,6 @@
 # journal-together
 
 ## Next steps
-- Move env vars into files
 - Deploy to gcloud vm
 - Set up actual messages
 - Set up server

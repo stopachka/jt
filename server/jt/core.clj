@@ -85,16 +85,16 @@
 ;; Reminders & Summaries
 
 (defn test-email [subject]
-  {:from "journal-buddy@journaltogether.com"
+  {:from "Journal Buddy <journal-buddy@journaltogether.com>"
    :to ["stepan.p@gmail.com"]
    :subject subject
    :html "will do nothing with a reply 4 now"})
 
 (defn send-reminders [_]
-  (log/infof (pr-str (test-email "how was your day? (this is a reminder)"))))
+  (send-mail (test-email "how was your day? (this is a reminder)")))
 
 (defn send-summaries [_]
-  (log/infof (pr-str (test-email "this is a summary email"))))
+  (send-mail (test-email "this is a summary email")))
 
 (defn -main []
   (firebase-init)
