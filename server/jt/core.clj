@@ -73,7 +73,7 @@
     (filter #(.isAfter % now) period)))
 
 (defn reminder-period []
-  (-> (pst-instant 13 15 0)
+  (-> (pst-instant 16 0 0)
       daily-period
       after-now))
 
