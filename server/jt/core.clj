@@ -56,7 +56,8 @@
   {:from "journal-buddy@journaltogether.com"
    :to ["joeaverbukh@gmail.com"
         "markshlick@gmail.com"
-        "stepan.p@gmail.com"]
+        "stepan.p@gmail.com"
+        "reichertjalex@gmail.com"]
    :subject subject
    :html "will do nothing with a reply 4 now"})
 
