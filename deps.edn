@@ -1,8 +1,11 @@
 {:paths ["server" "resources"]
- :deps {nilenso/mailgun {:mvn/version "0.2.3"}
-        com.google.firebase/firebase-admin {:mvn/version "6.14.0"}
+ :deps {com.google.firebase/firebase-admin {:mvn/version "6.14.0"}
+        compojure/compojure {:mvn/version "1.6.1"}
+        io.aviso/logging {:mvn/version "0.3.2"}
         jarohen/chime {:mvn/version "0.3.2"}
-        io.aviso/logging {:mvn/version "0.3.2"}}
+        nilenso/mailgun {:mvn/version "0.2.3"}
+        ring/ring {:mvn/version "1.8.0"}
+        ring/ring-json {:mvn/version "0.5.0"}}
  :aliases {:socket
            {:jvm-opts ["-Dclojure.server.repl={:port,50505,:accept,clojure.core.server/repl}"]}
            :uberjar
