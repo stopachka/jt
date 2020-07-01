@@ -2,16 +2,32 @@
   (:gen-class)
   (:require [mailgun.mail :as mail]
             [mailgun.util :refer [to-file]]
-            [chime.core :as chime-core])
+            [chime.core :as chime-core]
+            [clojure.java.io :as io]
+            [clojure.edn :as edn])
   (:import (com.google.firebase FirebaseApp FirebaseOptions$Builder)
            (com.google.auth.oauth2 ServiceAccountCredentials)
-           (java.time LocalTime ZonedDateTime ZoneId Period)))
+           (java.time LocalTime ZonedDateTime ZoneId Period)
+           (java.io PushbackReader)))
+
+;; Secrets
+
+(def secrets (-> "secrets.edn"
+                 io/resource
+                 io/reader
+                 PushbackReader.
+                 edn/read))
+;; Config
+
+(def config
+  {:root-domain "journaltogether.com"
+   :mailgun {:domain "mg.journaltogether.com"}
+   :firebase {:db-url "https://journaltogether.firebaseio.com"}})
 
 ;; Mail
 
-(def mailgun-domain "mg.journaltogether.com")
-(def mailgun-creds {:key (System/getenv "JT_MAILGUN_API_KEY")
-                    :domain mailgun-domain})
+(def mailgun-creds {:key (-> secrets :mailgun :api-key)
+                    :domain (-> config :mailgun :domain)})
 
 (defn send-mail [content]
   (mail/send-mail
@@ -21,12 +37,17 @@
 ;; Firebase
 
 (defn firebase-init []
-  (let [db-url (System/getenv "JT_FIREBASE_DB_URL")
+  (let [{:keys [db-url]} (:firebase config)
+        {:keys
+         [client-id
+          client-email
+          private-key
+          private-key-id]} (:firebase secrets)
         creds (ServiceAccountCredentials/fromPkcs8
-                (System/getenv "JT_FIREBASE_CLIENT_ID")
-                (System/getenv "JT_FIREBASE_CLIENT_EMAIL")
-                (System/getenv "JT_FIREBASE_PRIVATE_KEY")
-                (System/getenv "JT_FIREBASE_PRIVATE_KEY_ID")
+                client-id
+                client-email
+                private-key
+                private-key-id
                 [])
         options (-> (FirebaseOptions$Builder.)
                     (.setCredentials creds)
@@ -54,10 +75,7 @@
 
 (defn test-email [subject]
   {:from "journal-buddy@journaltogether.com"
-   :to ["joeaverbukh@gmail.com"
-        "markshlick@gmail.com"
-        "stepan.p@gmail.com"
-        "reichertjalex@gmail.com"]
+   :to ["stepan.p@gmail.com"]
    :subject subject
    :html "will do nothing with a reply 4 now"})
 
