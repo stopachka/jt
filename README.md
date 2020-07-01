@@ -1,7 +1,6 @@
 # journal-together
 
 ## Next steps
-- Deploy to gcloud vm
 - Set up actual messages
 - Set up server
 - Handle responses
