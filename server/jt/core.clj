@@ -145,12 +145,17 @@
 
 ;; Email Content
 
+
+(def group ["stepan.p@gmail.com"
+            "markshlick@gmail.com"
+            "joeaverbukh@gmail.com"
+            "reichertjalex@gmail.com"])
+
+(def hows-your-day-email "journal-buddy@mg.journaltogether.com")
+
 (defn content-hows-your-day? [day]
-  {:from "Journal Buddy <journal-buddy@mg.journaltogether.com>"
-   :to ["stepan.p@gmail.com"
-        "markshlick@gmail.com"
-        "joeaverbukh@gmail.com"
-        "reichertjalex@gmail.com"]
+  {:from hows-your-day-email
+   :to group
    :subject (str
               (fmt-with-pattern friendly-date-pattern day)
               " — 👋 How was your day?")
@@ -162,12 +167,11 @@
         "How was your day today? What's been on your mind? 😊 📝"
         "</p>")})
 
+(def summary-email "Journal Summary <journal-summary@mg.journaltogether.com>")
+
 (defn content-summary [day]
-  {:from "Journal Buddy <journal-buddy@mg.journaltogether.com>"
-   :to ["stepan.p@gmail.com"
-        "markshlick@gmail.com"
-        "joeaverbukh@gmail.com"
-        "reichertjalex@gmail.com"]
+  {:from summary-email
+   :to group
    :subject (str "☀️ Here's how things went "
                  (fmt-with-pattern friendly-date-pattern day))
    :html
@@ -179,7 +183,7 @@
         "</p>")})
 
 (defn content-ack-receive [email, subject]
-  {:from "Journal Buddy <journal-buddy@mg.journaltogether.com>"
+  {:from summary-email
    :to [email]
    :subject subject
    :html "Oky doke, received this 👌"})
@@ -189,23 +193,30 @@
 (defn mailgun-date-formatter []
   (DateTimeFormatter/ofPattern "EEE, d LLL yyyy HH:mm:ss ZZ"))
 
-(defn emails-handler [req]
-  (let [{:keys [params]} req
-        {:keys [sender
+(defn emails-handler [{:keys [params] :as req}]
+  (let [{:keys [sender
                 subject
                 stripped-text
-                stripped-html]} params
+                stripped-html
+                recipient]} params
         date (-> params
                  :Date
-                 (ZonedDateTime/parse (mailgun-date-formatter)))]
-    (firebase-save
-      (journal-path sender date)
-      {:email sender
-       :subject subject
-       :stripped-text stripped-text
-       :stripped-html stripped-html})
-    (send-mail (content-ack-receive sender subject))
-    (response {:ok "true"})))
+                 (ZonedDateTime/parse (mailgun-date-formatter)))
+        data {:email sender
+                      :subject subject
+                      :stripped-text stripped-text
+                      :stripped-html stripped-html}]
+    (if (not= recipient hows-your-day-email)
+      (log/infof "skipping for recipient %s data %s" recipient (pr-str data))
+      (do
+        (firebase-save
+          (journal-path sender date)
+          {:email sender
+           :subject subject
+           :stripped-text stripped-text
+           :stripped-html stripped-html})
+        (send-mail (content-ack-receive sender subject))))
+    (response {:receive true})))
 
 (comment
   (do
