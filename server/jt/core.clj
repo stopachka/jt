@@ -144,7 +144,7 @@
       daily-period
       after-now))
 
-;; Reminders & Summaries
+;; Email Content
 
 (defn content-hows-your-day? [day]
   {:from "Journal Buddy <journal-buddy@mg.journaltogether.com>"
@@ -182,15 +182,6 @@
    :subject subject
    :html "Oky doke, received this 👌"})
 
-(defn send-reminders [_]
-  (send-mail (content-hows-your-day? (pst-now))))
-
-(defn send-summaries [_]
-  (send-mail (content-summary (.minusDays (pst-now) 1))))
-
-(defn send-ack [email subject]
-  (send-mail (content-ack-receive email subject)))
-
 ;; HTTP Server
 
 (defn mailgun-date-formatter []
@@ -211,7 +202,7 @@
        :subject subject
        :stripped-text stripped-text
        :stripped-html stripped-html})
-    (send-ack sender subject)
+    (send-mail (content-ack-receive sender subject))
     (response {:ok "true"})))
 
 (comment
@@ -229,10 +220,12 @@
   (firebase-init)
   (future (chime-core/chime-at
             (reminder-period)
-            send-reminders))
+            (fn []
+              (send-mail (content-hows-your-day? (pst-now))))))
   (future (chime-core/chime-at
             (summary-period)
-            send-summaries))
+            (fn []
+              (send-mail (content-summary (.minusDays (pst-now) 1))))))
   (future
     (let [{:keys [port]} config
           app (-> routes
