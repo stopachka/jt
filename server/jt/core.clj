@@ -145,7 +145,6 @@
 
 ;; Email Content
 
-
 (def group ["stepan.p@gmail.com"
             "markshlick@gmail.com"
             "joeaverbukh@gmail.com"
@@ -169,54 +168,96 @@
 
 (def summary-email "Journal Summary <journal-summary@mg.journaltogether.com>")
 
-(defn content-summary [day]
-  {:from summary-email
-   :to group
-   :subject (str "☀️ Here's how things went "
-                 (fmt-with-pattern friendly-date-pattern day))
-   :html
-   (str "<p>"
-        "Howdy, Here's how things have went:"
-        "</p>"
-        "<p>"
-        "Coming soon : }"
-        "</p>")})
+(defn journal-entry->html [{:keys [sender stripped-html]}]
+  (str
+    "<p><b>"
+    sender
+    "</b></p>"
+    "<br>"
+    stripped-html
+    "<p></p>"))
+
+(defn content-summary [day entries]
+  (let [friendly-date-str (fmt-with-pattern friendly-date-pattern day)]
+    {:from summary-email
+     :to group
+     :subject (str "☀️ Here's how things went " friendly-date-str)
+     :html
+     (str "<p>"
+          "Howdy, Here's how things have went on " friendly-date-str
+          "</p>"
+          (->> entries
+               (map journal-entry->html)
+               str/join))}))
 
 (defn content-ack-receive [email, subject]
-  {:from summary-email
+  {:from hows-your-day-email
    :to [email]
    :subject subject
    :html "Oky doke, received this 👌"})
 
+(defn content-already-received [email, subject]
+  {:from hows-your-day-email
+   :to [email]
+   :subject subject
+   :html (str
+           "<p>Oi, I already logged a journal entry for you.</p>"
+           "<p>I can't do much with this. Ping Stopa sry 🙈</p>")})
+
+;; Schedule Handlers
+
+(defn handle-reminder []
+  (send-mail (content-hows-your-day? (pst-now))))
+
+(defn handle-summary []
+  (let [day (.minusDays (pst-now) 10)
+        entries (->> group
+                     (pmap (fn [email]
+                             @(firebase-fetch
+                                (journal-path email day))))
+                     (filter seq))]
+
+    (if-not (seq entries)
+      (log/infof "skipping for %s because there are not entries" day)
+      (send-mail (content-summary day entries)))))
+
 ;; HTTP Server
 
-(defn mailgun-date-formatter []
+(def mailgun-date-formatter
   (DateTimeFormatter/ofPattern "EEE, d LLL yyyy HH:mm:ss ZZ"))
 
-(defn emails-handler [{:keys [params] :as req}]
-  (let [{:keys [sender
-                subject
-                stripped-text
-                stripped-html
-                recipient]} params
-        date (-> params
+(defn parse-email-params [params]
+  (let [date (-> params
                  :Date
-                 (ZonedDateTime/parse (mailgun-date-formatter)))
-        data {:email sender
-                      :subject subject
-                      :stripped-text stripped-text
-                      :stripped-html stripped-html}]
-    (if (not= recipient hows-your-day-email)
-      (log/infof "skipping for recipient %s data %s" recipient (pr-str data))
-      (do
-        (firebase-save
-          (journal-path sender date)
-          {:email sender
-           :subject subject
-           :stripped-text stripped-text
-           :stripped-html stripped-html})
-        (send-mail (content-ack-receive sender subject))))
-    (response {:receive true})))
+                 (ZonedDateTime/parse mailgun-date-formatter))]
+    (-> params
+        (select-keys
+          #{:sender :subject :stripped-text :stripped-html :recipient})
+        (assoc :date date))))
+
+(defn emails-handler [{:keys [params]}]
+  (future
+    (let [{:keys
+           [sender recipient date subject] :as data} (parse-email-params params)
+          journal-path (journal-path sender date)]
+      (cond
+        (not= recipient hows-your-day-email)
+        (log/infof "skipping for recipient %s data %s" recipient data)
+
+        (seq @(firebase-fetch journal-path))
+        (do
+          (log/infof "already have a journal recorded for %s on " sender date)
+          (send-mail (content-already-received sender subject)))
+
+        :else
+        (do
+          (firebase-save
+            journal-path
+            (select-keys
+              data
+              #{:sender :subject :stripped-text :stripped-html}))
+          (send-mail (content-ack-receive sender subject))))))
+  (response {:receive true}))
 
 (comment
   (do
@@ -224,21 +265,18 @@
     (def _res (emails-handler _req))
     _res))
 
-(defroutes routes
-           ;; ---
-           ;; api
-           (POST "/api/emails" [] emails-handler))
+(defroutes
+  routes
+  (POST "/api/emails" [] emails-handler))
 
 (defn -main []
   (firebase-init)
   (future (chime-core/chime-at
             (reminder-period)
-            (fn []
-              (send-mail (content-hows-your-day? (pst-now))))))
+            handle-reminder))
   (future (chime-core/chime-at
             (summary-period)
-            (fn []
-              (send-mail (content-summary (.minusDays (pst-now) 1))))))
+            handle-summary))
   (future
     (let [{:keys [port]} config
           app (-> routes
