@@ -175,10 +175,11 @@
 (def friends (:friends secrets))
 
 (def hows-your-day-email "journal-buddy@mg.journaltogether.com")
+(def hows-your-day-from (str "Journal Buddy <" hows-your-day-email ">"))
 
 (defn content-hows-your-day? [day]
-  {:from hows-your-day-email
-   :to friends
+  {:from friends
+   :to ["stepan.p@gmail.com"]
    :subject (str
               (fmt-with-pattern friendly-date-pattern day)
               " — 👋 How was your day?")
@@ -190,7 +191,7 @@
         "How was your day today? What's been on your mind? 😊 📝"
         "</p>")})
 
-(def summary-email "Journal Summary <journal-summary@mg.journaltogether.com>")
+(def summary-from "Journal Summary <journal-summary@mg.journaltogether.com>")
 
 (defn journal-entry->html [{:keys [sender stripped-html]}]
   (str
@@ -203,7 +204,7 @@
 
 (defn content-summary [day entries]
   (let [friendly-date-str (fmt-with-pattern friendly-date-pattern day)]
-    {:from summary-email
+    {:from summary-from
      :to friends
      :subject (str "☀️ Here's how things went " friendly-date-str)
      :html
@@ -215,13 +216,13 @@
                str/join))}))
 
 (defn content-ack-receive [email, subject]
-  {:from hows-your-day-email
+  {:from hows-your-day-from
    :to [email]
    :subject subject
    :html "Oky doke, received this 👌"})
 
 (defn content-already-received [email, subject]
-  {:from hows-your-day-email
+  {:from hows-your-day-from
    :to [email]
    :subject subject
    :html (str
