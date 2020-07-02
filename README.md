@@ -10,3 +10,5 @@
 ## Someday-soon
 - Consider adding error handlers for chime schedules + http + errwhere :} 
 - Consider a full-on deploy script
+- Organize code and tighten up some of the indireciton (i.e the send-ack etc code seems a bit too much indirection)
+- Make sure I am using futures properly
