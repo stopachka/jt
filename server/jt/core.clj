@@ -109,7 +109,9 @@
     p))
 
 (defn email->id [email]
-  (str/replace email #"\." "-"))
+  (-> email
+      (str/replace #"\." "-")
+      (str/replace #"@" "_")))
 
 (defn journal-path [email zoned-date]
   (str "/journals/" (email->id email) "/" (year-month-day zoned-date)))
@@ -146,7 +148,7 @@
 
 (defn content-hows-your-day? [day]
   {:from "Journal Buddy <journal-buddy@mg.journaltogether.com>"
-   :to ["stepan.p@gmail.com"]
+   :to ["markshlick@gmail.com"]
    :subject (str (pretty-date day) " — 👋 How was your day?")
    :html
    (str "<p>"
