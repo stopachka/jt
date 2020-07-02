@@ -31,20 +31,16 @@
       PushbackReader.
       edn/read))
 
+(defn fmt-with-pattern [pattern zoned-date]
+  (-> (DateTimeFormatter/ofPattern pattern)
+      (.format zoned-date)))
+
 ;; i.e Wed Jul 1
-(defn pretty-date [zoned-date]
-  (-> (DateTimeFormatter/ofPattern "E LLL d")
-      (.format zoned-date)))
-
+(def friendly-date-pattern "E LLL d")
 ;; i.e Wednesday
-(defn pretty-day-of-week [zoned-date]
-  (-> (DateTimeFormatter/ofPattern "EEEE")
-      (.format zoned-date)))
-
+(def day-of-week-pattern "EEEE")
 ;; i.e 2020-07-01
-(defn year-month-day [zoned-date]
-  (-> (DateTimeFormatter/ofPattern "yyyy-MM-dd")
-      (.format zoned-date)))
+(def numeric-date-pattern "yyyy-MM-dd")
 
 ;; Secrets
 
@@ -114,7 +110,10 @@
       (str/replace #"@" "_")))
 
 (defn journal-path [email zoned-date]
-  (str "/journals/" (email->id email) "/" (year-month-day zoned-date)))
+  (str "/journals/"
+       (email->id email)
+       "/"
+       (fmt-with-pattern numeric-date-pattern zoned-date)))
 
 ;; Schedule
 
@@ -152,10 +151,12 @@
         "markshlick@gmail.com"
         "joeaverbukh@gmail.com"
         "reichertjalex@gmail.com"]
-   :subject (str (pretty-date day) " — 👋 How was your day?")
+   :subject (str
+              (fmt-with-pattern friendly-date-pattern day)
+              " — 👋 How was your day?")
    :html
    (str "<p>"
-        "Howdy, Happy " (pretty-day-of-week day)
+        "Howdy, Happy " (fmt-with-pattern day-of-week-pattern day)
         "</p>"
         "<p>"
         "How was your day today? What's been on your mind? 😊 📝"
@@ -167,7 +168,8 @@
         "markshlick@gmail.com"
         "joeaverbukh@gmail.com"
         "reichertjalex@gmail.com"]
-   :subject (str "☀️ Here's how things went " (pretty-date day))
+   :subject (str "☀️ Here's how things went "
+                 (fmt-with-pattern friendly-date-pattern day))
    :html
    (str "<p>"
         "Howdy, Here's how things have went:"
