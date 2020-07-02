@@ -5,3 +5,4 @@ jt.iml
 jt.jar
 secrets
 pom.xml
+resources/secrets.edn

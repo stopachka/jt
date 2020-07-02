@@ -22,6 +22,31 @@
            (com.google.firebase FirebaseApp FirebaseOptions$Builder)
            (com.google.firebase.database FirebaseDatabase ValueEventListener)))
 
+
+;; ->clj
+;; converts nested java objects from firebase into
+;; clojure persistant colls
+;; from https://groups.google.com/forum/#!topic/clojure/1NzLnWUtj0Q
+
+(defprotocol ConvertibleToClojure
+  (->clj [o]))
+
+(extend-protocol ConvertibleToClojure
+  java.util.Map
+  (->clj [o] (let [entries (.entrySet o)]
+               (reduce (fn [m [^String k v]]
+                         (assoc m (keyword k) (->clj v)))
+                       {} entries)))
+
+  java.util.List
+  (->clj [o] (vec (map ->clj o)))
+
+  java.lang.Object
+  (->clj [o] o)
+
+  nil
+  (->clj [_] nil))
+
 ;; Misc Helpers
 
 (defn read-edn-resource [path]
@@ -98,11 +123,13 @@
             (onDataChange [_ s]
               (deliver p (->> s
                               .getValue
-                              (into {})
-                              keywordize-keys)))
+                              ->clj)))
             (onCancelled [_ err]
               (throw err)))))
     p))
+
+(comment
+  @(firebase-fetch "/journals/stepan-p_gmail-com"))
 
 (defn email->id [email]
   (-> email
@@ -145,16 +172,13 @@
 
 ;; Email Content
 
-(def group ["stepan.p@gmail.com"
-            "markshlick@gmail.com"
-            "joeaverbukh@gmail.com"
-            "reichertjalex@gmail.com"])
+(def friends (:friends secrets))
 
 (def hows-your-day-email "journal-buddy@mg.journaltogether.com")
 
 (defn content-hows-your-day? [day]
   {:from hows-your-day-email
-   :to group
+   :to friends
    :subject (str
               (fmt-with-pattern friendly-date-pattern day)
               " — 👋 How was your day?")
@@ -180,7 +204,7 @@
 (defn content-summary [day entries]
   (let [friendly-date-str (fmt-with-pattern friendly-date-pattern day)]
     {:from summary-email
-     :to group
+     :to friends
      :subject (str "☀️ Here's how things went " friendly-date-str)
      :html
      (str "<p>"
@@ -211,7 +235,7 @@
 
 (defn handle-summary []
   (let [day (.minusDays (pst-now) 10)
-        entries (->> group
+        entries (->> friends
                      (pmap (fn [email]
                              @(firebase-fetch
                                 (journal-path email day))))
@@ -277,12 +301,11 @@
   (future (chime-core/chime-at
             (summary-period)
             handle-summary))
-  (future
-    (let [{:keys [port]} config
-          app (-> routes
-                  wrap-keyword-params
-                  ring.middleware.params/wrap-params
-                  (wrap-json-body {:keywords? true})
-                  wrap-json-response)]
-      (jetty/run-jetty app {:port port})))
+  (let [{:keys [port]} config
+        app (-> routes
+                wrap-keyword-params
+                ring.middleware.params/wrap-params
+                (wrap-json-body {:keywords? true})
+                wrap-json-response)]
+    (jetty/run-jetty app {:port port :join false}))
   (log/info "kicked off!"))
