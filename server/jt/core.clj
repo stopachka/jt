@@ -3,7 +3,9 @@
   (:require [chime.core :as chime-core]
             [clojure.edn :as edn]
             [clojure.java.io :as io]
+            [clojure.string :as str]
             [clojure.tools.logging :as log]
+            [clojure.walk :refer [stringify-keys keywordize-keys]]
             [compojure.core :refer [defroutes POST]]
             [io.aviso.logging.setup]
             [mailgun.mail :as mail]
@@ -17,7 +19,8 @@
            (java.io PushbackReader)
            (java.time LocalTime ZonedDateTime ZoneId Period Instant)
            (java.time.format DateTimeFormatter)
-           (com.google.firebase FirebaseApp FirebaseOptions$Builder)))
+           (com.google.firebase FirebaseApp FirebaseOptions$Builder)
+           (com.google.firebase.database FirebaseDatabase ValueEventListener)))
 
 ;; Misc Helpers
 
@@ -27,6 +30,21 @@
       io/reader
       PushbackReader.
       edn/read))
+
+;; i.e Wed Jul 1
+(defn pretty-date [zoned-date]
+  (-> (DateTimeFormatter/ofPattern "E LLL d")
+      (.format zoned-date)))
+
+;; i.e Wednesday
+(defn pretty-day-of-week [zoned-date]
+  (-> (DateTimeFormatter/ofPattern "EEEE")
+      (.format zoned-date)))
+
+;; i.e 2020-07-01
+(defn year-month-day [zoned-date]
+  (-> (DateTimeFormatter/ofPattern "yyyy-MM-dd")
+      (.format zoned-date)))
 
 ;; Secrets
 
@@ -49,7 +67,7 @@
     mailgun-creds
     content))
 
-;; Firebase
+;; DB
 
 (defn firebase-init []
   (let [{:keys [db-url]} (:firebase config)
@@ -69,6 +87,32 @@
                     (.setDatabaseUrl db-url)
                     .build)]
     (FirebaseApp/initializeApp options)))
+
+(defn firebase-save [path v]
+  (-> (FirebaseDatabase/getInstance)
+      (.getReference path)
+      (.setValueAsync (stringify-keys v))))
+
+(defn firebase-fetch [path]
+  (let [p (promise)]
+    (-> (FirebaseDatabase/getInstance)
+        (.getReference path)
+        (.addListenerForSingleValueEvent
+          (reify ValueEventListener
+            (onDataChange [_ s]
+              (deliver p (->> s
+                              .getValue
+                              (into {})
+                              keywordize-keys)))
+            (onCancelled [_ err]
+              (throw err)))))
+    p))
+
+(defn email->id [email]
+  (str/replace email #"\." "-"))
+
+(defn journal-path [email zoned-date]
+  (str "/journals/" (email->id email) "/" (year-month-day zoned-date)))
 
 ;; Schedule
 
@@ -100,16 +144,6 @@
 
 ;; Reminders & Summaries
 
-;; i.e Wed Jul 1
-(defn pretty-date [zoned-date]
-  (-> (DateTimeFormatter/ofPattern "E LLL d")
-      (.format zoned-date)))
-
-;; i.e Wednesday
-(defn pretty-day-of-week [zoned-date]
-  (-> (DateTimeFormatter/ofPattern "EEEE")
-      (.format zoned-date)))
-
 (defn content-hows-your-day? [day]
   {:from "Journal Buddy <journal-buddy@mg.journaltogether.com>"
    :to ["stepan.p@gmail.com"]
@@ -134,18 +168,43 @@
         "Coming soon : }"
         "</p>")})
 
+(defn content-ack-receive [email, subject]
+  {:from "Journal Buddy <journal-buddy@mg.journaltogether.com>"
+   :to [email]
+   :subject subject
+   :html "Oky doke, received this 👌"})
+
 (defn send-reminders [_]
   (send-mail (content-hows-your-day? (pst-now))))
 
 (defn send-summaries [_]
   (send-mail (content-summary (.minusDays (pst-now) 1))))
 
+(defn send-ack [email subject]
+  (send-mail (content-ack-receive email subject)))
+
 ;; HTTP Server
 
+(defn mailgun-date-formatter []
+  (DateTimeFormatter/ofPattern "EEE, d LLL yyyy HH:mm:ss ZZ"))
+
 (defn emails-handler [req]
-  (let [{:keys [sender]} (:params req)]
-    (response {:message "🏓 pong!"})
-    sender))
+  (let [{:keys [params]} req
+        {:keys [sender
+                subject
+                stripped-text
+                stripped-html]} params
+        date (-> params
+                 :Date
+                 (ZonedDateTime/parse (mailgun-date-formatter)))]
+    (firebase-save
+      (journal-path sender date)
+      {:email sender
+       :subject subject
+       :stripped-text stripped-text
+       :stripped-html stripped-html})
+    (send-ack sender subject)
+    (response {:ok "true"})))
 
 (comment
   (do
