@@ -148,7 +148,10 @@
 
 (defn content-hows-your-day? [day]
   {:from "Journal Buddy <journal-buddy@mg.journaltogether.com>"
-   :to ["markshlick@gmail.com"]
+   :to ["stepan.p@gmail.com"
+        "markshlick@gmail.com"
+        "joeaverbukh@gmail.com"
+        "reichertjalex@gmail.com"]
    :subject (str (pretty-date day) " — 👋 How was your day?")
    :html
    (str "<p>"
@@ -160,7 +163,10 @@
 
 (defn content-summary [day]
   {:from "Journal Buddy <journal-buddy@mg.journaltogether.com>"
-   :to ["stepan.p@gmail.com"]
+   :to ["stepan.p@gmail.com"
+        "markshlick@gmail.com"
+        "joeaverbukh@gmail.com"
+        "reichertjalex@gmail.com"]
    :subject (str "☀️ Here's how things went " (pretty-date day))
    :html
    (str "<p>"
