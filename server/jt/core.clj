@@ -19,13 +19,18 @@
            (java.time.format DateTimeFormatter)
            (com.google.firebase FirebaseApp FirebaseOptions$Builder)))
 
+;; Misc Helpers
+
+(defn read-edn-resource [path]
+  (-> path
+      io/resource
+      io/reader
+      PushbackReader.
+      edn/read))
+
 ;; Secrets
 
-(def secrets (-> "secrets.edn"
-                 io/resource
-                 io/reader
-                 PushbackReader.
-                 edn/read))
+(def secrets (read-edn-resource "secrets.edn"))
 
 ;; Config
 
@@ -137,10 +142,16 @@
 
 ;; HTTP Server
 
-(def _req (atom nil))
 (defn emails-handler [req]
-  (reset! _req (atom req))
-  (response {:message "🏓 pong!"}))
+  (let [{:keys [sender]} (:params req)]
+    (response {:message "🏓 pong!"})
+    sender))
+
+(comment
+  (do
+    (def _req (read-edn-resource "api-emails-req.edn"))
+    (def _res (emails-handler _req))
+    _res))
 
 (defroutes routes
            ;; ---
