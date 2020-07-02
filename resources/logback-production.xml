@@ -4,7 +4,7 @@
       <level>INFO</level>
     </filter>
     <log>jt.log</log>
-    <resourceType>jt</resourceType>
+    <resourceType>gae_app</resourceType>
     <flushLevel>WARN</flushLevel>
   </appender>
   <root level="info">
