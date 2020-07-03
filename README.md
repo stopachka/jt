@@ -18,5 +18,5 @@ make prod-ssh
 pkill -f java
 rm jt.jar
 gsutil cp gs://jt-builds/jt-foo.jar jt.jar
-java -Dclojure.server.repl='{:port 50505 :accept clojure.core.server/repl}' -cp jt.jar clojure.main -m jt.core &
+java -Dclojure.server.repl='{:port 50505 :accept clojure.core.server/repl}' -Dlogback.configurationFile='logback-production.xml' -cp jt.jar clojure.main -m jt.core &
 ```
