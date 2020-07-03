@@ -144,9 +144,9 @@
 
 ;; Schedule
 
+(def pst-zone (ZoneId/of "America/Los_Angeles"))
 (defn pst-now []
-  (ZonedDateTime/now
-    (ZoneId/of "America/Los_Angeles")))
+  (ZonedDateTime/now pst-zone))
 
 (defn pst-instant [h m s]
   (-> (LocalTime/of h m s)
@@ -199,14 +199,15 @@
         "How was your day today? What's been on your mind? 😊 📝"
         "</p>")})
 
-(defn journal-entry->html [{:keys [sender stripped-html]}]
+(defn journal-entry->html [{:keys [sender stripped-text]}]
   (str
     "<p><b>"
     sender
     "</b></p>"
     "<br>"
-    stripped-html
-    "<p></p>"))
+    "<div style=\"white-space:pre\">"
+    stripped-text
+    "</div>"))
 
 (defn content-summary [day entries]
   (let [friendly-date-str (fmt-with-pattern friendly-date-pattern day)]
@@ -237,25 +238,28 @@
 
 ;; Schedule Handlers
 
-(defn handle-reminder []
+(defn handle-reminder [_]
   (send-mail (content-hows-your-day? (pst-now))))
 
-(defn handle-summary []
-  (let [day (.minusDays (pst-now) 10)
+(defn handle-summary [_]
+  (let [day (.minusDays (pst-now) 1)
         entries (->> friends
                      (pmap (fn [email]
                              @(firebase-fetch
                                 (journal-path email day))))
                      (filter seq))]
 
+
     (if-not (seq entries)
-      (log/infof "skipping for %s because there are not entries" day)
+      (log/infof "skipping for %s because there are no entries" day)
       (send-mail (content-summary day entries)))))
 
 ;; HTTP Server
 
 (def mailgun-date-formatter
-  (DateTimeFormatter/ofPattern "EEE, d LLL yyyy HH:mm:ss ZZ"))
+  (-> "EEE, d LLL yyyy HH:mm:ss ZZ"
+      DateTimeFormatter/ofPattern
+      (.withZone pst-zone)))
 
 (defn parse-email-params [params]
   (let [date (-> params
@@ -271,6 +275,7 @@
     (let [{:keys
            [sender recipient date subject] :as data} (parse-email-params params)
           journal-path (journal-path sender date)]
+      (log/infof "[api/emails] received data=%s" data)
       (cond
         (not= recipient hows-your-day-email)
         (log/infof "skipping for recipient %s data %s" recipient data)
