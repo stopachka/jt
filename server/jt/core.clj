@@ -52,9 +52,8 @@
 (defn read-edn-resource [path]
   (-> path
       io/resource
-      io/reader
-      PushbackReader.
-      edn/read))
+      slurp
+      edn/read-string))
 
 (defn fmt-with-pattern [pattern zoned-date]
   (-> (DateTimeFormatter/ofPattern pattern)

@@ -1,11 +1,11 @@
 # journal-together
 
 ## Next steps
-- Look into enabling logging on google cloud
+- Consider removing the clj logging lib, in favor of more barebones
+- Play with instance groups, instance templates, and a full on deploy script    
 
 ## Someday-soon
 - Consider adding error handlers for chime schedules + http + errwhere :}
-- Consider a full-on deploy script
 - Consider building a quick site
 - Add support for "groups"
 
