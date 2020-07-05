@@ -16,12 +16,18 @@
             [ring.middleware.params :refer [wrap-params]]
             [ring.util.response :refer [response]])
   (:import (com.google.auth.oauth2 ServiceAccountCredentials)
-           (java.io PushbackReader)
            (java.time LocalTime ZonedDateTime ZoneId Period Instant)
            (java.time.format DateTimeFormatter)
            (com.google.firebase FirebaseApp FirebaseOptions$Builder)
            (com.google.firebase.database FirebaseDatabase ValueEventListener)))
 
+;; fut-async
+(defmacro fut-async [& form]
+  `(future
+     (try
+       ~@form
+       (catch Exception e#
+         (log/errorf "uh-oh, failed to run async function %s %s" '~form e#)))))
 
 ;; ->clj
 ;; converts nested java objects from firebase into
@@ -135,11 +141,14 @@
       (str/replace #"\." "-")
       (str/replace #"@" "_")))
 
+(defn ->numeric-date-str [zoned-date]
+  (fmt-with-pattern numeric-date-pattern zoned-date))
+
 (defn journal-path [email zoned-date]
   (str "/journals/"
        (email->id email)
        "/"
-       (fmt-with-pattern numeric-date-pattern zoned-date)))
+       (->numeric-date-str zoned-date)))
 
 ;; Schedule
 
@@ -174,7 +183,8 @@
 (defn email-with-name [email name]
   (str name " <" email ">"))
 
-(def friends (:friends secrets))
+(def friends
+  (:friends secrets))
 
 (def hows-your-day-email "journal-buddy@mg.journaltogether.com")
 (def hows-your-day-email-with-name
@@ -198,14 +208,19 @@
         "How was your day today? What's been on your mind? 😊 📝"
         "</p>")})
 
-(defn journal-entry->html [{:keys [sender stripped-text]}]
+(defn poor-mans-parse [body-html]
+  (->> (str/split body-html #"<br>")
+       (take-while #(not (str/includes? % "gmail_quote")))
+       (str/join "<br>")))
+
+(defn journal-entry->html [{:keys [sender body-html]}]
   (str
     "<p><b>"
     sender
     "</b></p>"
     "<br>"
     "<div style=\"white-space:pre\">"
-    stripped-text
+    (poor-mans-parse body-html)
     "</div>"))
 
 (defn content-summary [day entries]
@@ -260,19 +275,20 @@
       DateTimeFormatter/ofPattern
       (.withZone pst-zone)))
 
-(defn parse-email-params [params]
-  (let [date (-> params
-                 :Date
-                 (ZonedDateTime/parse mailgun-date-formatter))]
-    (-> params
-        (select-keys
-          #{:sender :subject :stripped-text :stripped-html :recipient})
-        (assoc :date date))))
+(defn parse-email-date [params]
+  (-> params
+      :Date
+      (ZonedDateTime/parse mailgun-date-formatter)))
 
-(defn emails-handler [{:keys [params]}]
-  (future
-    (let [{:keys
-           [sender recipient date subject] :as data} (parse-email-params params)
+(def email-keys
+  #{:sender :subject :stripped-text :stripped-html
+    :recipient :body-html :body-plain})
+
+(defn emails-handler [{:keys [params] :as req}]
+  (fut-async
+    (let [{:keys [sender recipient subject date] :as data}
+          (-> params
+              (assoc :date (parse-email-date params)))
           journal-path (journal-path sender date)]
       (log/infof "[api/emails] received data=%s" data)
       (cond
@@ -288,9 +304,9 @@
         (do
           (firebase-save
             journal-path
-            (select-keys
-              data
-              #{:sender :subject :stripped-text :stripped-html}))
+            (-> data
+                (update :date ->numeric-date-str)
+                (select-keys email-keys)))
           (send-mail (content-ack-receive sender subject))))))
   (response {:receive true}))
 
@@ -306,12 +322,12 @@
 
 (defn -main []
   (firebase-init)
-  (future (chime-core/chime-at
-            (reminder-period)
-            handle-reminder))
-  (future (chime-core/chime-at
-            (summary-period)
-            handle-summary))
+  (fut-async (chime-core/chime-at
+               (reminder-period)
+               handle-reminder))
+  (fut-async (chime-core/chime-at
+               (summary-period)
+               handle-summary))
   (let [{:keys [port]} config
         app (-> routes
                 wrap-keyword-params
