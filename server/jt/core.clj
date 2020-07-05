@@ -21,23 +21,29 @@
            (com.google.firebase FirebaseApp FirebaseOptions$Builder)
            (com.google.firebase.database FirebaseDatabase ValueEventListener)))
 
-;; fut-bg
-;; future only throw once derefed
-;; this macro lets you run futures in the background, without
-;; ever dereferencing them, by wrapping a top-level try-catch
-(defmacro fut-bg [& form]
+;; ------------------------------------------------------------------------------
+;; Macros
+
+(defmacro fut-bg
+  "Futures only throw when de-referenced. fut-bg writes a future
+  with a top-level try-catch, so you can run code asynchronously,
+  without _ever_ de-referencing them"
+  [& forms]
   `(future
      (try
-       ~@form
+       ~@forms
        (catch Exception e#
-         (log/errorf "uh-oh, failed to run async function %s %s" '~form e#)))))
+         (log/errorf "uh-oh, failed to run async function %s %s" '~form e#)
+         (throw e#)))))
 
-;; ->clj
-;; converts nested java objects from firebase into
-;; clojure persistant colls
-;; from https://groups.google.com/forum/#!topic/clojure/1NzLnWUtj0Q
+;; ------------------------------------------------------------------------------
+;; Protocols
 
 (defprotocol ConvertibleToClojure
+  "Converts nested java objects to clojure objects.
+  This is useful when we fetch data from firebase.
+  Instead of working on mutable objects, we transform them
+  to keywordized immutable clojure ones"
   (->clj [o]))
 
 (extend-protocol ConvertibleToClojure
@@ -56,46 +62,54 @@
   nil
   (->clj [_] nil))
 
+;; ------------------------------------------------------------------------------
 ;; Misc Helpers
 
-(defn read-edn-resource [path]
+(defn read-edn-resource
+  "Transforms a resource in our classpath to edn"
+  [path]
   (-> path
       io/resource
       slurp
       edn/read-string))
 
-(defn fmt-with-pattern [pattern zoned-date]
-  (-> (DateTimeFormatter/ofPattern pattern)
+
+;; ------------------------------------------------------------------------------
+;; Date Helpers
+
+(def friendly-date-pattern
+  "i.e Wed Jul 1"
+  "E LLL d")
+
+(def day-of-week-pattern
+  "i.e Wednesday"
+  "EEEE")
+
+(def numeric-date-pattern
+  "i.e 2020-07-01"
+  "yyyy-MM-dd")
+
+(defn fmt-with-pattern
+  [str-pattern zoned-date]
+  (-> (DateTimeFormatter/ofPattern str-pattern)
       (.format zoned-date)))
 
-;; i.e Wed Jul 1
-(def friendly-date-pattern "E LLL d")
-;; i.e Wednesday
-(def day-of-week-pattern "EEEE")
-;; i.e 2020-07-01
-(def numeric-date-pattern "yyyy-MM-dd")
 
-;; Secrets
+;; ------------------------------------------------------------------------------
+;; Config
 
 (def secrets (read-edn-resource "secrets.edn"))
-
-;; Config
 
 (def config
   {:port 8080
    :mailgun {:domain "mg.journaltogether.com"}
    :firebase {:db-url "https://journaltogether.firebaseio.com"}})
 
-;; Mail
 
-(def mailgun-creds {:key (-> secrets :mailgun :api-key)
-                    :domain (-> config :mailgun :domain)})
+(def friends
+  (:friends secrets))
 
-(defn send-mail [content]
-  (mail/send-mail
-    mailgun-creds
-    content))
-
+;; ------------------------------------------------------------------------------
 ;; DB
 
 (defn firebase-init []
@@ -153,6 +167,19 @@
        "/"
        (->numeric-date-str zoned-date)))
 
+;; ------------------------------------------------------------------------------
+;; Mail
+
+(def mailgun-creds {:key (-> secrets :mailgun :api-key)
+                    :domain (-> config :mailgun :domain)})
+
+;; TODO: consider adding spec here
+(defn send-mail [content]
+  (mail/send-mail
+    mailgun-creds
+    content))
+
+;; ------------------------------------------------------------------------------
 ;; Schedule
 
 (def pst-zone (ZoneId/of "America/Los_Angeles"))
@@ -181,13 +208,12 @@
       daily-period
       after-now))
 
-;; Email Content
+;; ------------------------------------------------------------------------------
+;; Content
 
 (defn email-with-name [email name]
   (str name " <" email ">"))
 
-(def friends
-  (:friends secrets))
 
 (def hows-your-day-email "journal-buddy@mg.journaltogether.com")
 (def hows-your-day-email-with-name
@@ -253,7 +279,8 @@
            "<p>Oi, I already logged a journal entry for you.</p>"
            "<p>I can't do much with this. Ping Stopa sry 🙈</p>")})
 
-;; Schedule Handlers
+;; ------------------------------------------------------------------------------
+;; Outgoing Mail
 
 (defn handle-reminder [_]
   (send-mail (content-hows-your-day? (pst-now))))
@@ -271,7 +298,8 @@
       (log/infof "skipping for %s because there are no entries" day)
       (send-mail (content-summary day entries)))))
 
-;; HTTP Server
+;; ------------------------------------------------------------------------------
+;; Incoming Mail
 
 (def mailgun-date-formatter
   (-> "EEE, d LLL yyyy HH:mm:ss ZZ"
@@ -318,6 +346,9 @@
     (def _req (read-edn-resource "api-emails-req.edn"))
     (def _res (emails-handler _req))
     _res))
+
+;; ------------------------------------------------------------------------------
+;; Server
 
 (defroutes
   routes
