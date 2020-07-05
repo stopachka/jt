@@ -21,8 +21,11 @@
            (com.google.firebase FirebaseApp FirebaseOptions$Builder)
            (com.google.firebase.database FirebaseDatabase ValueEventListener)))
 
-;; fut-async
-(defmacro fut-async [& form]
+;; fut-bg
+;; future only throw once derefed
+;; this macro lets you run futures in the background, without
+;; ever dereferencing them, by wrapping a top-level try-catch
+(defmacro fut-bg [& form]
   `(future
      (try
        ~@form
@@ -285,7 +288,7 @@
     :recipient :body-html :body-plain})
 
 (defn emails-handler [{:keys [params] :as req}]
-  (fut-async
+  (fut-bg
     (let [{:keys [sender recipient subject date] :as data}
           (-> params
               (assoc :date (parse-email-date params)))
@@ -322,16 +325,16 @@
 
 (defn -main []
   (firebase-init)
-  (fut-async (chime-core/chime-at
+  (fut-bg (chime-core/chime-at
                (reminder-period)
                handle-reminder))
-  (fut-async (chime-core/chime-at
+  (fut-bg (chime-core/chime-at
                (summary-period)
                handle-summary))
   (let [{:keys [port]} config
         app (-> routes
                 wrap-keyword-params
-                ring.middleware.params/wrap-params
+                wrap-params
                 (wrap-json-body {:keywords? true})
                 wrap-json-response)]
     (jetty/run-jetty app {:port port :join false}))
