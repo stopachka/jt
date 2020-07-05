@@ -8,15 +8,14 @@
             [clojure.walk :refer [stringify-keys keywordize-keys]]
             [compojure.core :refer [defroutes POST]]
             [io.aviso.logging.setup]
-            [mailgun.mail :as mail]
-            [mailgun.util :refer [to-file]]
+            [jt.sendgrid :as sg]
             [ring.adapter.jetty :as jetty]
             [ring.middleware.json :refer [wrap-json-body wrap-json-response]]
             [ring.middleware.keyword-params :refer [wrap-keyword-params]]
             [ring.middleware.params :refer [wrap-params]]
+            [ring.middleware.multipart-params :refer [wrap-multipart-params]]
             [ring.util.response :refer [response]])
   (:import (com.google.auth.oauth2 ServiceAccountCredentials)
-           (java.io PushbackReader)
            (java.time LocalTime ZonedDateTime ZoneId Period Instant)
            (java.time.format DateTimeFormatter)
            (com.google.firebase FirebaseApp FirebaseOptions$Builder)
@@ -74,18 +73,14 @@
 
 (def config
   {:port 8080
-   :mailgun {:domain "mg.journaltogether.com"}
    :firebase {:db-url "https://journaltogether.firebaseio.com"}})
 
 ;; Mail
 
-(def mailgun-creds {:key (-> secrets :mailgun :api-key)
-                    :domain (-> config :mailgun :domain)})
+(def sendgrid-api-token (-> secrets :sendgrid :api-token))
 
 (defn send-mail [content]
-  (mail/send-mail
-    mailgun-creds
-    content))
+  (sg/send-email sendgrid-api-token content))
 
 ;; DB
 
@@ -176,17 +171,17 @@
 
 (def friends (:friends secrets))
 
-(def hows-your-day-email "journal-buddy@mg.journaltogether.com")
+(def hows-your-day-email "journal-buddy@sg.journaltogether.com")
 (def hows-your-day-email-with-name
   (email-with-name hows-your-day-email "Journal Buddy"))
 
-(def summary-email "journal-summary@mg.journaltogether.com")
+(def summary-email "journal-summary@sg.journaltogether.com")
 (def summary-email-with-name
   (email-with-name summary-email "Journal Summary"))
 
 (defn content-hows-your-day? [day]
   {:from hows-your-day-email-with-name
-   :to friends
+   :to "stepan.p@gmail.com"
    :subject (str
               (fmt-with-pattern friendly-date-pattern day)
               " — 👋 How was your day?")
@@ -268,9 +263,10 @@
         (select-keys
           #{:sender :subject :stripped-text :stripped-html :recipient})
         (assoc :date date))))
-
-(defn emails-handler [{:keys [params]}]
-  (future
+(def em (atom nil))
+(defn emails-handler [{:keys [params] :as req}]
+  (reset! em req)
+  #_(future
     (let [{:keys
            [sender recipient date subject] :as data} (parse-email-params params)
           journal-path (journal-path sender date)]
@@ -315,7 +311,8 @@
   (let [{:keys [port]} config
         app (-> routes
                 wrap-keyword-params
-                ring.middleware.params/wrap-params
+                wrap-params
+                wrap-multipart-params
                 (wrap-json-body {:keywords? true})
                 wrap-json-response)]
     (jetty/run-jetty app {:port port :join false}))
