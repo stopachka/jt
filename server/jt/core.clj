@@ -94,6 +94,8 @@
   (-> (DateTimeFormatter/ofPattern str-pattern)
       (.format zoned-date)))
 
+(defn ->numeric-date-str [zoned-date]
+  (fmt-with-pattern numeric-date-pattern zoned-date))
 
 ;; ------------------------------------------------------------------------------
 ;; Config
@@ -158,9 +160,6 @@
       (str/replace #"\." "-")
       (str/replace #"@" "_")))
 
-(defn ->numeric-date-str [zoned-date]
-  (fmt-with-pattern numeric-date-pattern zoned-date))
-
 (defn journal-path [email zoned-date]
   (str "/journals/"
        (email->id email)
@@ -173,11 +172,8 @@
 (def mailgun-creds {:key (-> secrets :mailgun :api-key)
                     :domain (-> config :mailgun :domain)})
 
-;; TODO: consider adding spec here
 (defn send-mail [content]
-  (mail/send-mail
-    mailgun-creds
-    content))
+  (mail/send-mail mailgun-creds content))
 
 ;; ------------------------------------------------------------------------------
 ;; Schedule
@@ -214,7 +210,6 @@
 (defn email-with-name [email name]
   (str name " <" email ">"))
 
-
 (def hows-your-day-email "journal-buddy@mg.journaltogether.com")
 (def hows-your-day-email-with-name
   (email-with-name hows-your-day-email "Journal Buddy"))
@@ -237,7 +232,12 @@
         "How was your day today? What's been on your mind? 😊 📝"
         "</p>")})
 
-(defn poor-mans-parse [body-html]
+(defn ONLY-GMAIL-poor-mans-parse-last-response
+  "Mailgun has :stripped-text, but the html they provide is
+  borked. Emojis don't work : (. This is our work around for now.
+  We rely on the fact that all of our friends are on gmail, and
+  gmail provides a special `gmail_quote` tag."
+  [body-html]
   (->> (str/split body-html #"<br>")
        (take-while #(not (str/includes? % "gmail_quote")))
        (str/join "<br>")))
@@ -249,7 +249,7 @@
     "</b></p>"
     "<br>"
     "<div style=\"white-space:pre\">"
-    (poor-mans-parse body-html)
+    (ONLY-GMAIL-poor-mans-parse-last-response body-html)
     "</div>"))
 
 (defn content-summary [day entries]
