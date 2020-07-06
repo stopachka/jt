@@ -316,13 +316,13 @@
 
 (defn handle-reminder [_]
   (let [day (pst-now)
-        task-id (->numeric-date-str day)]
+        task-id (str "reminder-" (->numeric-date-str day))]
     (when (try-grab-task! task-id)
       (send-mail (content-hows-your-day? (pst-now))))))
 
 (defn handle-summary [_]
   (let [day (.minusDays (pst-now) 1)
-        task-id (->numeric-date-str day)]
+        task-id (str "summary-" (->numeric-date-str day))]
     (when (try-grab-task! task-id)
       (let [entries (->> friends
                          (pmap (fn [email]
