@@ -242,7 +242,7 @@
 
 (defn content-hows-your-day? [day]
   {:from hows-your-day-email-with-name
-   :to friends
+   :to ["stepan.p@gmail.com"]
    :subject (str
               (fmt-with-pattern friendly-date-pattern day)
               " — 👋 How was your day?")
@@ -311,7 +311,9 @@
   [task-id]
   (try
     @(firebase-save (task-path task-id) true)
+    (log/infof "[task] grabbed %s" task-id)
     (catch DatabaseException _e
+      (log/infof "[task] skipping %s" task-id)
       nil)))
 
 (defn handle-reminder [_]

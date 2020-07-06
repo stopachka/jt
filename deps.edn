@@ -1,6 +1,7 @@
 {:paths ["server" "resources"]
  :deps {com.google.firebase/firebase-admin {:mvn/version "6.14.0"}
         com.google.cloud/google-cloud-logging-logback {:mvn/version "0.118.0-alpha"}
+        org.clojure/tools.trace {:mvn/version "0.7.10"}
         compojure/compojure {:mvn/version "1.6.1"}
         io.aviso/logging {:mvn/version "0.3.2"}
         jarohen/chime {:mvn/version "0.3.2"}
