@@ -19,10 +19,13 @@
            (java.time LocalTime ZonedDateTime ZoneId Period Instant)
            (java.time.format DateTimeFormatter)
            (com.google.firebase FirebaseApp FirebaseOptions$Builder)
-           (com.google.firebase.database FirebaseDatabase ValueEventListener)))
+           (com.google.firebase.database FirebaseDatabase ValueEventListener DatabaseReference$CompletionListener DatabaseException)
+           (clojure.lang IDeref)
+           (java.util UUID)))
+
 
 ;; ------------------------------------------------------------------------------
-;; Macros
+;; Helpers
 
 (defmacro fut-bg
   "Futures only throw when de-referenced. fut-bg writes a future
@@ -33,17 +36,31 @@
      (try
        ~@forms
        (catch Exception e#
-         (log/errorf "uh-oh, failed to run async function %s %s" '~form e#)
+         (log/errorf "uh-oh, failed to run async function %s %s" '~forms e#)
          (throw e#)))))
 
-;; ------------------------------------------------------------------------------
-;; Protocols
+(defn throwable-promise
+  "clojure promises do not have a concept of reject.
+  this mimics the idea: you can pass a function, which receives
+  a resolve, and reject function
+
+  If you reject a promise, it will throw when de-referenced"
+  [f]
+  (let [p (promise)
+        resolve #(deliver p [nil %])
+        reject #(deliver p [% nil])
+        throwable-p (reify IDeref
+                      (deref [this]
+                        (let [[err res] @p]
+                          (if err (throw err) res))))]
+    (f resolve reject)
+    throwable-p))
 
 (defprotocol ConvertibleToClojure
   "Converts nested java objects to clojure objects.
-  This is useful when we fetch data from firebase.
-  Instead of working on mutable objects, we transform them
-  to keywordized immutable clojure ones"
+   This is useful when we fetch data from firebase.
+   Instead of working on mutable objects, we transform them
+   to keywordized immutable clojure ones"
   (->clj [o]))
 
 (extend-protocol ConvertibleToClojure
@@ -62,9 +79,6 @@
   nil
   (->clj [_] nil))
 
-;; ------------------------------------------------------------------------------
-;; Misc Helpers
-
 (defn read-edn-resource
   "Transforms a resource in our classpath to edn"
   [path]
@@ -72,7 +86,6 @@
       io/resource
       slurp
       edn/read-string))
-
 
 ;; ------------------------------------------------------------------------------
 ;; Date Helpers
@@ -105,7 +118,9 @@
 (def config
   {:port 8080
    :mailgun {:domain "mg.journaltogether.com"}
-   :firebase {:db-url "https://journaltogether.firebaseio.com"}})
+   :firebase
+   {:auth {:uid "jt-sv"}
+    :db-url "https://journaltogether.firebaseio.com"}})
 
 
 (def friends
@@ -115,7 +130,7 @@
 ;; DB
 
 (defn firebase-init []
-  (let [{:keys [db-url]} (:firebase config)
+  (let [{:keys [db-url auth]} (:firebase config)
         {:keys
          [client-id
           client-email
@@ -130,30 +145,34 @@
         options (-> (FirebaseOptions$Builder.)
                     (.setCredentials creds)
                     (.setDatabaseUrl db-url)
+                    (.setDatabaseAuthVariableOverride
+                      (stringify-keys auth))
                     .build)]
     (FirebaseApp/initializeApp options)))
 
 (defn firebase-save [path v]
-  (-> (FirebaseDatabase/getInstance)
-      (.getReference path)
-      (.setValueAsync (stringify-keys v))))
+  (throwable-promise
+    (fn [resolve reject]
+      (-> (FirebaseDatabase/getInstance)
+          (.getReference path)
+          (.setValue
+            (stringify-keys v)
+            (reify DatabaseReference$CompletionListener
+              (onComplete [_this err ref]
+                (if err (reject (.toException err))
+                        (resolve ref)))))))))
 
 (defn firebase-fetch [path]
-  (let [p (promise)]
-    (-> (FirebaseDatabase/getInstance)
-        (.getReference path)
-        (.addListenerForSingleValueEvent
-          (reify ValueEventListener
-            (onDataChange [_ s]
-              (deliver p (->> s
-                              .getValue
-                              ->clj)))
-            (onCancelled [_ err]
-              (throw err)))))
-    p))
-
-(comment
-  @(firebase-fetch "/journals/stepan-p_gmail-com"))
+  (throwable-promise
+    (fn [resolve reject]
+      (-> (FirebaseDatabase/getInstance)
+          (.getReference path)
+          (.addListenerForSingleValueEvent
+            (reify ValueEventListener
+              (onDataChange [_this s]
+                (resolve (->> s .getValue ->clj)))
+              (onCancelled [_this err]
+                (reject (.toException err)))))))))
 
 (defn email->id [email]
   (-> email
@@ -165,6 +184,9 @@
        (email->id email)
        "/"
        (->numeric-date-str zoned-date)))
+
+(defn task-path [task-id]
+  (str "/tasks/" task-id))
 
 ;; ------------------------------------------------------------------------------
 ;; Mail
@@ -220,7 +242,7 @@
 
 (defn content-hows-your-day? [day]
   {:from hows-your-day-email-with-name
-   :to friends
+   :to ["stepan.p@gmail.com"]
    :subject (str
               (fmt-with-pattern friendly-date-pattern day)
               " — 👋 How was your day?")
@@ -282,21 +304,36 @@
 ;; ------------------------------------------------------------------------------
 ;; Outgoing Mail
 
+(defn try-grab-task!
+  "given a task id, tries to reserve the task. Our database rules
+  do not allow writes to existing tasks. This ensures only one can
+  succeed, so only one worker can grab a task"
+  [task-id]
+  (try
+    @(firebase-save (task-path task-id) true)
+    (log/infof "[task] grabbed %s" task-id)
+    (catch DatabaseException _e
+      (log/infof "[task] skipping %s" task-id)
+      nil)))
+
 (defn handle-reminder [_]
-  (send-mail (content-hows-your-day? (pst-now))))
+  (let [day (pst-now)
+        task-id (str "reminder-" (->numeric-date-str day))]
+    (when (try-grab-task! task-id)
+      (send-mail (content-hows-your-day? (pst-now))))))
 
 (defn handle-summary [_]
   (let [day (.minusDays (pst-now) 1)
-        entries (->> friends
-                     (pmap (fn [email]
-                             @(firebase-fetch
-                                (journal-path email day))))
-                     (filter seq))]
-
-
-    (if-not (seq entries)
-      (log/infof "skipping for %s because there are no entries" day)
-      (send-mail (content-summary day entries)))))
+        task-id (str "summary-" (->numeric-date-str day))]
+    (when (try-grab-task! task-id)
+      (let [entries (->> friends
+                         (pmap (fn [email]
+                                 @(firebase-fetch
+                                    (journal-path email day))))
+                         (filter seq))]
+        (if-not (seq entries)
+          (log/infof "skipping for %s because there are no entries" day)
+          (send-mail (content-summary day entries)))))))
 
 ;; ------------------------------------------------------------------------------
 ;; Incoming Mail
@@ -357,11 +394,11 @@
 (defn -main []
   (firebase-init)
   (fut-bg (chime-core/chime-at
-               (reminder-period)
-               handle-reminder))
+            (reminder-period)
+            handle-reminder))
   (fut-bg (chime-core/chime-at
-               (summary-period)
-               handle-summary))
+            (summary-period)
+            handle-summary))
   (let [{:keys [port]} config
         app (-> routes
                 wrap-keyword-params
