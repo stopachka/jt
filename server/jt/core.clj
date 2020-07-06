@@ -312,6 +312,7 @@
   (try
     @(firebase-save (task-path task-id) true)
     (log/infof "[task] grabbed %s" task-id)
+    :grabbed
     (catch DatabaseException _e
       (log/infof "[task] skipping %s" task-id)
       nil)))
