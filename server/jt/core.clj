@@ -6,7 +6,7 @@
             [clojure.string :as str]
             [clojure.tools.logging :as log]
             [clojure.walk :refer [stringify-keys keywordize-keys]]
-            [compojure.core :refer [defroutes POST]]
+            [compojure.core :refer [defroutes GET POST]]
             [io.aviso.logging.setup]
             [mailgun.mail :as mail]
             [mailgun.util :refer [to-file]]
@@ -387,9 +387,14 @@
 ;; ------------------------------------------------------------------------------
 ;; Server
 
+(defn fallback-handler [_]
+  (response
+    "<html><h1 style='font-family: Helvetica Neue'>Hello world!</h1></html"))
+
 (defroutes
   routes
-  (POST "/api/emails" [] emails-handler))
+  (POST "/api/emails" [] emails-handler)
+  (GET "*" [] fallback-handler))
 
 (defn -main []
   (firebase-init)
