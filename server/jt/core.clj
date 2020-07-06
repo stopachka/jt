@@ -242,7 +242,7 @@
 
 (defn content-hows-your-day? [day]
   {:from hows-your-day-email-with-name
-   :to ["stepan.p@gmail.com"]
+   :to friends
    :subject (str
               (fmt-with-pattern friendly-date-pattern day)
               " — 👋 How was your day?")
