@@ -12,7 +12,7 @@
           :X-Envelope-From "<stepan.p@gmail.com>",
           :Dkim-Signature "v=1; a=rsa-sha256; c=relaxed/relaxed;        d=gmail.com; s=20161025;        h=mime-version:references:in-reply-to:from:date:message-id:subject:to;        bh=8qymBqqgS1GvonOEvKAV9AMimctYJ1+P8sJjsjUKTx8=;        b=QVg2bzbG3paeqDdfKsC3K7WAR46WKyQbGkRmigA9kSBAq2OnxpnMQsWTm+EJVD1BbO         50Rk6xbQHFQVcVLvcepY2Y6OWYq/xe4vqmH4StPjIFqXYEUz33DeS+aUm4w30s1yecqB         jGrzcxwPB20V1IU7E1BxNTJxnnfGqLG+WJQG1EXk4F2D5AxqwOOs0/d52kAZpZSly2PG         /2DQb1vbpKj4xb4fvgljlixI9sxlfDQqYyuItbNfvHiYGDqwmy1cc0GH10WyVaQAnC4x         o+TE+U1NCxHRIbPDB24SWl1uSIFix5VKb6oCExBztbVinbvheszMsfwqIAtKLxlnEDB9         cqMg==",
           :signature "4a406dd319d2bac05bd0a0f937005d7df69a3aaaedb2539d4b7737c7c2c66e99",
-          :recipient "journal-buddyy@mg.journaltogether.com",
+          :recipient "journal-buddy@mg.journaltogether.com",
           :X-Gm-Message-State "AOAM530WRqzbiBoTWFxh9S+MP2ItwPLNnGYh2seSYM50ZpE4mmyQXhxx\t7ChLTsBXaKEX8q11ajIMSgZCwFtnAIAioAv4Lxv6x0QA",
           :stripped-text "it was great!",
           :Subject "Re: Wed Jul 1 — 👋 How was your day?",

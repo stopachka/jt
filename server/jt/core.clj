@@ -20,7 +20,8 @@
            (java.time.format DateTimeFormatter)
            (com.google.firebase FirebaseApp FirebaseOptions$Builder)
            (com.google.firebase.database FirebaseDatabase ValueEventListener DatabaseReference$CompletionListener DatabaseException)
-           (clojure.lang IDeref)))
+           (clojure.lang IDeref)
+           (java.sql Timestamp)))
 
 
 ;; ------------------------------------------------------------------------------
@@ -108,6 +109,11 @@
 
 (defn ->numeric-date-str [zoned-date]
   (fmt-with-pattern numeric-date-pattern zoned-date))
+
+(defn ->epoch-milli [zoned-date]
+  (-> zoned-date
+      .toInstant
+      .toEpochMilli))
 
 ;; ------------------------------------------------------------------------------
 ;; Config
@@ -350,18 +356,21 @@
 
 (def email-keys
   #{:sender :subject :stripped-text :stripped-html
-    :recipient :body-html :body-plain})
+    :recipient :body-html :body-plain :at})
 
 (defn emails-handler [{:keys [params] :as req}]
   (fut-bg
     (let [{:keys [sender recipient subject date] :as data}
           (-> params
               (assoc :date (parse-email-date params)))
+          email (-> data
+                    (assoc :at (->epoch-milli date))
+                    (select-keys email-keys))
           journal-path (journal-path sender date)]
-      (log/infof "[api/emails] received data=%s" data)
+      (log/infof "[api/emails] received email=%s" email)
       (cond
         (not= recipient hows-your-day-email)
-        (log/infof "skipping for recipient %s data %s" recipient data)
+        (log/infof "skipping for recipient=%s email=%s" recipient email)
 
         (seq @(firebase-fetch journal-path))
         (do
@@ -370,11 +379,7 @@
 
         :else
         (do
-          (firebase-save
-            journal-path
-            (-> data
-                (update :date ->numeric-date-str)
-                (select-keys email-keys)))
+          (firebase-save journal-path email)
           (send-mail (content-ack-receive sender subject))))))
   (response {:receive true}))
 
