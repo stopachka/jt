@@ -3,8 +3,8 @@
 ## Next steps
 
 ## Someday-soon
-- Consider building a quick site
 - Add support for "groups"
+- Consider building a quick site
 - Consider removing the clj logging lib, in favor of more barebones
 
 ## Deploy
