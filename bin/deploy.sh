@@ -1,15 +1,27 @@
 #!/usr/bin/env sh
-# https://gist.github.com/dwwoelfel/57f1fbe3d95d5d9e0e20029fa5798d72
-set -ex
 
-BUILD_ID=$(uuidgen)
+set -x
+set -e
 
-# make prod-build-jar
+BUILD_ID=$(uuidgen | tr 'A-Z' 'a-z')
+INSTANCE_GROUP="jt-clj"
+PROJECT="journaltogether"
+ZONE="us-central1-a"
+TEMPLATE_NAME="jt-jar-${BUILD_ID}"
 STORAGE_PATH="gs://jt-builds/build_${BUILD_ID}/jar.jar"
+
+# ---------------
+# Build Jar
+
+make prod-build-jar
 gsutil cp jt.jar "gs://jt-builds/build_${BUILD_ID}/jar.jar"
 
+# ---------------
+# Startup Script
+
 echo '#!/usr/bin/env sh
-set -ex
+set -x
+set -e
 ulimit -n 500000
 
 # install java
@@ -17,5 +29,46 @@ ulimit -n 500000
 # download jt binary
 gsutil cp '${STORAGE_PATH}' jt.jar
 chmod +x jt.jar
-env OCAMLRUNPARAM="b,v=0x404" BUILD_NUMBER='${build_id}' GIT_SHA='${build_sha}' ONE_ENV=prod ./onegraph &
+java -Dclojure.server.repl="{:port 50505 :accept clojure.core.server/repl}" -Dlogback.configurationFile="logback-production.xml" -cp jt.jar clojure.main -m jt.core &
 ' > startup-script.sh
+
+# ---------------
+# Shutdown Script
+
+echo '#!/usr/bin/env sh
+set -x
+set -e
+PID=$(pgrep -x jt.core)
+kill $PID
+while (pgrep -x java) do
+  sleep 1
+done' > shutdown-script.sh
+
+# ---------------
+# Setup template
+
+gcloud compute instance-templates create $TEMPLATE_NAME \
+  --min-cpu-platform=haswell \
+  --image-project $PROJECT \
+  --image jt-debian-java \
+  --machine-type n1-standard-1 \
+  --tags "allow-health-check,https-server" \
+  --metadata-from-file startup-script=startup-script.sh,shutdown-script=shutdown-script.sh \
+  --project $PROJECT
+
+# ---------------
+# Update Instance Group
+
+gcloud compute instance-groups managed wait-until --stable $INSTANCE_GROUP \
+  --timeout 600 \
+  --zone $ZONE \
+  --project $PROJECT
+
+gcloud beta compute instance-groups managed rolling-action start-update $INSTANCE_GROUP \
+       --version template=$TEMPLATE_NAME \
+       --zone $ZONE \
+       --type proactive \
+       --max-surge 6 \
+       --max-unavailable 0 \
+       --project $PROJECT \
+       --min-ready 30 # seconds to wait for instance to start

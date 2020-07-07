@@ -5,4 +5,6 @@ jt.iml
 jt.jar
 secrets
 pom.xml
+startup-script.sh
+shutdown-script.sh
 resources/secrets.edn

@@ -20,8 +20,7 @@
            (java.time.format DateTimeFormatter)
            (com.google.firebase FirebaseApp FirebaseOptions$Builder)
            (com.google.firebase.database FirebaseDatabase ValueEventListener DatabaseReference$CompletionListener DatabaseException)
-           (clojure.lang IDeref)
-           (java.util UUID)))
+           (clojure.lang IDeref)))
 
 
 ;; ------------------------------------------------------------------------------
@@ -50,7 +49,7 @@
         resolve #(deliver p [nil %])
         reject #(deliver p [% nil])
         throwable-p (reify IDeref
-                      (deref [this]
+                      (deref [_this]
                         (let [[err res] @p]
                           (if err (throw err) res))))]
     (f resolve reject)
