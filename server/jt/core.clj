@@ -389,7 +389,33 @@
 
 (defn fallback-handler [_]
   (response
-    "<html><h1 style='font-family: Helvetica Neue'>Hello world!</h1></html"))
+    "<html>
+      <style>
+        body {
+          max-width: 500px;
+          padding: 10px;
+          margin: 0 auto;
+          font-family: Helvetica Neue;
+        }
+        h1, h2, h3 {
+          font-weight: 500;
+        }
+        li {
+          line-height: 1.6
+        }
+      </style>
+      <body>
+       <h1>journaltogether</h1>
+       <h3>Keep track of your days and connect with your friends</h3>
+       <ol>
+         <li>Choose a few friends</li>
+         <li>Every evening, each of you will receive an email, asking about your day</li>
+         <li>Each of you write a reflection</li>
+         <li>The next morning, you'll all receive an email of all reflections</li>
+       </ol>
+       <h4>Interested? <a href='mailto:stepan.p@gmail.com' target='_blank'>send a ping : )</a></h4>
+      </body>
+     </html>"))
 
 (defroutes
   routes
