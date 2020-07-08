@@ -9,7 +9,7 @@
             [compojure.core :refer [defroutes GET POST]]
             [io.aviso.logging.setup]
             [mailgun.mail :as mail]
-            [mailgun.util :refer [to-file]]
+            [markdown.core :as markdown-core]
             [ring.adapter.jetty :as jetty]
             [ring.middleware.json :refer [wrap-json-body wrap-json-response]]
             [ring.middleware.keyword-params :refer [wrap-keyword-params]]
@@ -20,8 +20,7 @@
            (java.time.format DateTimeFormatter)
            (com.google.firebase FirebaseApp FirebaseOptions$Builder)
            (com.google.firebase.database FirebaseDatabase ValueEventListener DatabaseReference$CompletionListener DatabaseException)
-           (clojure.lang IDeref)
-           (java.sql Timestamp)))
+           (clojure.lang IDeref)))
 
 
 ;; ------------------------------------------------------------------------------
@@ -259,25 +258,13 @@
         "How was your day today? What's been on your mind? 😊 📝"
         "</p>")})
 
-(defn ONLY-GMAIL-poor-mans-parse-last-response
-  "Mailgun has :stripped-text, but the html they provide is
-  borked. Emojis don't work : (. This is our work around for now.
-  We rely on the fact that all of our friends are on gmail, and
-  gmail provides a special `gmail_quote` tag."
-  [body-html]
-  (->> (str/split body-html #"<br>")
-       (take-while #(not (str/includes? % "gmail_quote")))
-       (str/join "<br>")))
-
-(defn journal-entry->html [{:keys [sender body-html]}]
+(defn journal-entry->html [{:keys [sender stripped-text]}]
   (str
     "<p><b>"
     sender
     "</b></p>"
     "<br>"
-    "<div style=\"white-space:pre\">"
-    (ONLY-GMAIL-poor-mans-parse-last-response body-html)
-    "</div>"))
+    (markdown-core/md-to-html-string stripped-text)))
 
 (defn content-summary [day entries]
   (let [friendly-date-str (fmt-with-pattern friendly-date-pattern day)]
