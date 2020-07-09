@@ -360,9 +360,7 @@
   routes
   (POST "/api/emails" [] emails-handler)
 
-  ;; ------------------------------------------------------------------------------
   ;; static assets
-
   (resources "/" {:root static-root})
   (GET "*" [] (render-static-file "index.html")))
 
