@@ -5,7 +5,7 @@
            (com.google.firebase.database
              FirebaseDatabase
              ValueEventListener
-             DatabaseReference$CompletionListener)
+             DatabaseReference$CompletionListener DatabaseReference)
            (clojure.lang IDeref)
            (com.google.firebase.auth UserRecord FirebaseAuth UserRecord$CreateRequest)))
 
@@ -49,11 +49,14 @@
     (f resolve reject)
     throwable-p))
 
-(defn firebase-save [path v]
+(defn firebase-ref [path]
+  (-> (FirebaseDatabase/getInstance)
+      (.getReference path)))
+
+(defn firebase-save [^DatabaseReference ref v]
   (throwable-promise
     (fn [resolve reject]
-      (-> (FirebaseDatabase/getInstance)
-          (.getReference path)
+      (-> ref
           (.setValue
             (stringify-keys v)
             (reify DatabaseReference$CompletionListener
@@ -100,6 +103,27 @@
 (defn create-token-for-uid! [uid]
   (-> (FirebaseAuth/getInstance)
       (.createCustomToken uid)))
+
+;; ------------------------------------------------------------------------------
+;; magic codes
+
+(def magic-code-root "/magic-codes/")
+(defn- magic-code-path [code] (str magic-code-root code))
+
+(defn create-magic-code! [uid]
+  (let [key (-> (firebase-ref magic-code-root)
+                .push
+                (firebase-save {:at (str (System/currentTimeMillis))
+                                :uid uid})
+                deref
+                .getKey)]
+    {:key key}))
+
+(defn get-magic-code [code]
+  (firebase-fetch (magic-code-path code)))
+
+(defn kill-magic-code [code]
+  (firebase-save (firebase-ref (magic-code-path code)) nil))
 
 ;; ------------------------------------------------------------------------------
 ;; init

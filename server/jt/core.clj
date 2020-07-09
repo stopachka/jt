@@ -213,8 +213,8 @@
            "<p>Oi, I already logged a journal entry for you.</p>"
            "<p>I can't do much with this. Ping Stopa sry 🙈</p>")})
 
-(defn home-url [uid]
-  (str "https://www.journaltogether.com/u/" uid))
+(defn url-with-magic-code [magic-code]
+  (str "https://www.journaltogether.com/u?magic-code=" magic-code))
 
 (defn content-created-user [to subject uid]
   {:from signup-email-with-name
@@ -224,7 +224,7 @@
    (str
      "<p>Welcome to Journal Together!</p>
      Visit "
-     (home-url uid)
+     (url-with-magic-code uid)
      "to get started")})
 
 (defn content-requested-user-info [to subject uid]
@@ -235,7 +235,7 @@
    (str
      "<p>Great to see you!</p>
      Visit "
-     (home-url uid)
+     (url-with-magic-code uid)
      "to manage your profile")})
 
 ;; ------------------------------------------------------------------------------
@@ -247,7 +247,7 @@
   succeed, so only one worker can grab a task"
   [task-id]
   (try
-    @(db/firebase-save (task-path task-id) true)
+    @(db/firebase-save (db/firebase-ref (task-path task-id)) true)
     (log/infof "[task] grabbed %s" task-id)
     :grabbed
     (catch DatabaseException _e
@@ -307,7 +307,7 @@
 
       :else
       (do
-        (db/firebase-save (journal-path sender date) email)
+        (db/firebase-save (db/firebase-ref (journal-path sender date)) email)
         (send-email (content-ack-receive sender subject))))))
 
 ;; ------------------------------------------------------------------------------
@@ -317,10 +317,10 @@
   (let [{:keys [sender subject]} data]
     (try
       (let [{:keys [uid]} (db/create-user! sender)]
-        (send-email (content-created-user sender subject uid)))
+        (send-email (content-created-user sender subject (db/create-magic-code! uid))))
       (catch FirebaseAuthException e
         (if-let [{:keys [uid]} (db/get-user-by-email! sender)]
-          (send-email (content-requested-user-info sender subject uid))
+          (send-email (content-requested-user-info sender subject (db/create-magic-code! uid)))
           (log/warnf e "uh oh, failed to fetch %s" sender))))))
 
 ;; ------------------------------------------------------------------------------
@@ -353,8 +353,8 @@
 
 (defn auth-handler [{:keys [params] :as _req}]
   (->> params
-       :uid
-       db/get-user-by-uid!
+       :magic-code
+       db/get-magic-code
        :uid
        db/create-token-for-uid!
        (assoc {} :token)
