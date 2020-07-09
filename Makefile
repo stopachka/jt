@@ -24,7 +24,7 @@ prod-build-jar:
 	clojure -A:uberjar jt.jar
 
 	# cleanup
-	rm jt.pom
+	rm pom.xml
 	rm -rf resources/public
 
 prod-deploy:
