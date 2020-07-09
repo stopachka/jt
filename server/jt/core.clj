@@ -244,6 +244,8 @@
 (def summary-email-with-name
   (email-with-name summary-email "Journal Summary"))
 
+(def signup-email "sign-up@mg.journaltogether.com")
+
 (defn content-hows-your-day? [day]
   {:from hows-your-day-email-with-name
    :to friends
@@ -345,29 +347,50 @@
   #{:sender :subject :stripped-text :stripped-html
     :recipient :body-html :body-plain :at})
 
+;; ------------------------------------------------------------------------------
+;; handle-hows-your-day-response
+
+(defn data->journal [data]
+  (-> data
+      (assoc :at (->epoch-milli (:date data)))
+      (select-keys email-keys)))
+
+(defn handle-hows-your-day-response! [data]
+  (let [{:keys [sender subject date]} data
+        email (data->journal data)]
+    (cond
+      (seq @(firebase-fetch (journal-path sender date)))
+      (do
+        (log/infof "already have a journal recorded for %s on " sender date)
+        (send-mail (content-already-received sender subject)))
+
+      :else
+      (do
+        (firebase-save (journal-path sender date) email)
+        (send-mail (content-ack-receive sender subject))))))
+
+;; ------------------------------------------------------------------------------
+;; handle-signup
+
+(defn handle-signup-response [data])
+
+;; ------------------------------------------------------------------------------
+;; emails-handler
+
 (defn emails-handler [{:keys [params] :as req}]
   (fut-bg
-    (let [{:keys [sender recipient subject date] :as data}
+    (let [{:keys [recipient sender] :as data}
           (-> params
-              (assoc :date (parse-email-date params)))
-          email (-> data
-                    (assoc :at (->epoch-milli date))
-                    (select-keys email-keys))
-          journal-path (journal-path sender date)]
-      (log/infof "[api/emails] received email=%s" email)
-      (cond
-        (not= recipient hows-your-day-email)
-        (log/infof "skipping for recipient=%s email=%s" recipient email)
+              (assoc :date (parse-email-date params)))]
+      (condp = recipient
+        hows-your-day-email
+        (handle-hows-your-day-response! data)
 
-        (seq @(firebase-fetch journal-path))
-        (do
-          (log/infof "already have a journal recorded for %s on " sender date)
-          (send-mail (content-already-received sender subject)))
+        signup-email
+        (handle-signup-response data)
 
         :else
-        (do
-          (firebase-save journal-path email)
-          (send-mail (content-ack-receive sender subject))))))
+        (log/infof "skipping for recipient=%s sender=%s" recipient sender))))
   (response {:receive true}))
 
 (comment
