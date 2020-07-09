@@ -24,11 +24,11 @@ set -x
 set -e
 ulimit -n 500000
 
-# install java
-
 # download jt binary
 gsutil cp '${STORAGE_PATH}' jt.jar
 chmod +x jt.jar
+
+# kick off jar
 java -Dclojure.server.repl="{:port 50505 :accept clojure.core.server/repl}" -Dlogback.configurationFile="logback-production.xml" -cp jt.jar clojure.main -m jt.core &
 ' > startup-script.sh
 
@@ -65,10 +65,10 @@ gcloud compute instance-groups managed wait-until --stable $INSTANCE_GROUP \
   --project $PROJECT
 
 gcloud beta compute instance-groups managed rolling-action start-update $INSTANCE_GROUP \
-       --version template=$TEMPLATE_NAME \
-       --zone $ZONE \
-       --type proactive \
-       --max-surge 6 \
-       --max-unavailable 0 \
-       --project $PROJECT \
-       --min-ready 30 # seconds to wait for instance to start
+  --version template=$TEMPLATE_NAME \
+  --zone $ZONE \
+  --type proactive \
+  --max-surge 6 \
+  --max-unavailable 0 \
+  --project $PROJECT \
+  --min-ready 30 # seconds to wait for instance to start

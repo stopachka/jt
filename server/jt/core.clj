@@ -7,6 +7,7 @@
             [clojure.tools.logging :as log]
             [jt.db :as db]
             [compojure.core :refer [defroutes GET POST]]
+            [compojure.route :refer [resources]]
             [io.aviso.logging.setup]
             [mailgun.mail :as mail]
             [markdown.core :as markdown-core]
@@ -14,7 +15,7 @@
             [ring.middleware.json :refer [wrap-json-body wrap-json-response]]
             [ring.middleware.keyword-params :refer [wrap-keyword-params]]
             [ring.middleware.params :refer [wrap-params]]
-            [ring.util.response :refer [response]])
+            [ring.util.response :as resp :refer [response]])
   (:import (java.time LocalTime ZonedDateTime ZoneId Period Instant)
            (java.time.format DateTimeFormatter)
            (com.google.firebase.database DatabaseException)
@@ -79,6 +80,7 @@
 
 (def config
   {:port 8080
+   :static-root "public"
    :mailgun {:domain "mg.journaltogether.com"}
    :firebase
    {:auth {:uid "jt-sv"}
@@ -349,40 +351,20 @@
 ;; ------------------------------------------------------------------------------
 ;; Server
 
-(defn fallback-handler [_]
-  (response
-    "<html>
-      <style>
-        body {
-          max-width: 500px;
-          padding: 10px;
-          margin: 0 auto;
-          font-family: Helvetica Neue;
-        }
-        h1, h2, h3 {
-          font-weight: 500;
-        }
-        li {
-          line-height: 1.6
-        }
-      </style>
-      <body>
-       <h1>journaltogether</h1>
-       <h3>Keep track of your days and connect with your friends</h3>
-       <ol>
-         <li>Choose a few friends</li>
-         <li>Every evening, each of you will receive an email, asking about your day</li>
-         <li>Each of you write a reflection</li>
-         <li>The next morning, you'll all receive an email of all reflections</li>
-       </ol>
-       <h4>Interested? <a href='mailto:stepan.p@gmail.com' target='_blank'>send a ping : )</a></h4>
-      </body>
-     </html>"))
+(def static-root (:static-root config))
+(defn render-static-file [filename]
+  (resp/content-type
+    (resp/resource-response filename {:root static-root}) "text/html"))
 
 (defroutes
   routes
   (POST "/api/emails" [] emails-handler)
-  (GET "*" [] fallback-handler))
+
+  ;; ------------------------------------------------------------------------------
+  ;; static assets
+
+  (resources "/" {:root static-root})
+  (GET "*" [] (render-static-file "index.html")))
 
 (defn -main []
   (db/init config secrets)
