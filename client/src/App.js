@@ -18,12 +18,31 @@ firebase.initializeApp({
   measurementId: "G-GYBL76DZQW"
 });
 
+function serverPath(path) { 
+  const root = process.env.NODE_ENV === 'development'
+    ? 'http://localhost:8080'
+    : ''
+  return `${root}/${path}`
+}
+
 class AccountComp extends React.Component {
   constructor(props) {
     super(props);
   }
 
   componentDidMount() {
+    const {uid} = this.props.match.params;
+    fetch(
+      serverPath('api/auth'),
+      {
+        method: 'POST',
+        'Content-Type': 'application/json',
+        body: JSON.stringify({uid}),
+      }
+    ).then(x => x.json())
+    .then(({token}) => {
+      firebase.auth().signInWithCustomToken(token);
+    });
     // Ask server to auth user
     // get token and validate firebase
     // listen to changes for firebase
@@ -72,7 +91,7 @@ class App extends React.Component {
       <div className="App">
         <Router>
           <Switch>
-            <Route path="/u/:id">
+            <Route path="/u/:uid">
               <Account />
             </Route>
             <Route path="/">

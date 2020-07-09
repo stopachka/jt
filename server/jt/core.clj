@@ -363,6 +363,12 @@
 ;; ------------------------------------------------------------------------------
 ;; Server
 
+(defn wrap-cors [handler]
+  (fn [request]
+    (assoc-in (handler request)
+              [:headers "Access-Control-Allow-Origin"]
+              "*")))
+
 (def static-root (:static-root config))
 (defn render-static-file [filename]
   (resp/content-type
@@ -387,6 +393,7 @@
             handle-summary))
   (let [{:keys [port]} config
         app (-> routes
+                wrap-cors
                 wrap-keyword-params
                 wrap-params
                 (wrap-json-body {:keywords? true})
