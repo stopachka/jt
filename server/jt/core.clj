@@ -15,7 +15,7 @@
             [ring.middleware.json :refer [wrap-json-body wrap-json-response]]
             [ring.middleware.keyword-params :refer [wrap-keyword-params]]
             [ring.middleware.params :refer [wrap-params]]
-            [ring.util.response :as resp :refer [response]])
+            [ring.util.response :as resp :refer [response bad-request]])
   (:import (java.time LocalTime ZonedDateTime ZoneId Period Instant)
            (java.time.format DateTimeFormatter)
            (com.google.firebase.database DatabaseException)
@@ -214,7 +214,7 @@
            "<p>I can't do much with this. Ping Stopa sry 🙈</p>")})
 
 (defn url-with-magic-code [magic-code]
-  (str "https://www.journaltogether.com/u?magic-code=" magic-code))
+  (str "https://www.journaltogether.com/mc-auth?mc=" magic-code))
 
 (defn content-created-user [to subject uid]
   {:from signup-email-with-name
@@ -351,23 +351,22 @@
 ;; ------------------------------------------------------------------------------
 ;; auth
 
-(defn auth-handler [{:keys [params] :as _req}]
-  (->> params
-       :magic-code
-       db/get-magic-code
-       :uid
-       db/create-token-for-uid!
-       (assoc {} :token)
-       response))
+(defn auth-handler [{:keys [body] :as _req}]
+  (let [{:keys [magic-code]} body
+        {:keys [uid]} @(db/get-magic-code magic-code)]
+    (if (seq uid)
+      (do (fut-bg @(db/kill-magic-code magic-code))
+          (response {:token (db/create-token-for-uid! uid)}))
+      (bad-request {:reason "could not validate magic code"}))))
 
 ;; ------------------------------------------------------------------------------
 ;; Server
 
 (defn wrap-cors [handler]
   (fn [request]
-    (assoc-in (handler request)
-              [:headers "Access-Control-Allow-Origin"]
-              "*")))
+    (-> (handler request)
+        (assoc-in [:headers "Access-Control-Allow-Origin"] "*")
+        (assoc-in [:headers "Access-Control-Allow-Headers"] "*"))))
 
 (def static-root (:static-root config))
 (defn render-static-file [filename]
@@ -393,10 +392,10 @@
             handle-summary))
   (let [{:keys [port]} config
         app (-> routes
-                wrap-cors
                 wrap-keyword-params
                 wrap-params
                 (wrap-json-body {:keywords? true})
-                wrap-json-response)]
+                wrap-json-response
+                wrap-cors)]
     (jetty/run-jetty app {:port port :join? false}))
   (log/info "kicked off!"))

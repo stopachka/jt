@@ -3,6 +3,7 @@ import "./App.css";
 import { withRouter } from "react-router"
 import { BrowserRouter as Router, Switch, Route } from "react-router-dom";
 import * as firebase from 'firebase/app';
+import qs from 'qs';
 
 // Set up Firebase
 import 'firebase/auth';
@@ -25,23 +26,26 @@ function serverPath(path) {
   return `${root}/${path}`
 }
 
-class AccountComp extends React.Component {
+class AuthComp extends React.Component {
   constructor(props) {
     super(props);
   }
 
   componentDidMount() {
-    const {uid} = this.props.match.params;
+    const code = qs.parse(this.props.location.search, { ignoreQueryPrefix: true })['mc'];
     fetch(
       serverPath('api/auth'),
       {
         method: 'POST',
-        'Content-Type': 'application/json',
-        body: JSON.stringify({uid}),
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({'magic-code': code}),
       }
-    ).then(x => x.json())
+    ).then(x => x.status === 200 ? x.json() : Promise.reject("uh oh"))
     .then(({token}) => {
       firebase.auth().signInWithCustomToken(token);
+    })
+    .catch(() => {
+      console.log('todo');
     });
     // Ask server to auth user
     // get token and validate firebase
@@ -53,7 +57,7 @@ class AccountComp extends React.Component {
   }
 }
 
-const Account = withRouter(AccountComp);
+const Auth = withRouter(AuthComp);
 
 function Home() {
   return (
@@ -91,8 +95,8 @@ class App extends React.Component {
       <div className="App">
         <Router>
           <Switch>
-            <Route path="/u/:uid">
-              <Account />
+            <Route path="/mc-auth">
+              <Auth />
             </Route>
             <Route path="/">
               <Home />
