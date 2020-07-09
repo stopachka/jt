@@ -92,6 +92,15 @@
       (.getUserByEmail email)
       user-record->map))
 
+(defn get-user-by-uid! [uid]
+  (-> (FirebaseAuth/getInstance)
+      (.getUser uid)
+      user-record->map))
+
+(defn create-token-for-uid! [uid]
+  (-> (FirebaseAuth/getInstance)
+      (.createCustomToken uid)))
+
 ;; ------------------------------------------------------------------------------
 ;; init
 

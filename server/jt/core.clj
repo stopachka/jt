@@ -349,6 +349,18 @@
     _res))
 
 ;; ------------------------------------------------------------------------------
+;; auth
+
+(defn auth-handler [{:keys [params] :as _req}]
+  (->> params
+       :uid
+       db/get-user-by-uid!
+       :uid
+       db/create-token-for-uid!
+       (assoc {} :token)
+       response))
+
+;; ------------------------------------------------------------------------------
 ;; Server
 
 (def static-root (:static-root config))
@@ -359,6 +371,7 @@
 (defroutes
   routes
   (POST "/api/emails" [] emails-handler)
+  (POST "/api/auth" [] auth-handler)
 
   ;; static assets
   (resources "/" {:root static-root})
