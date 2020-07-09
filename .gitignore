@@ -8,3 +8,4 @@ pom.xml
 startup-script.sh
 shutdown-script.sh
 resources/secrets.edn
+resources/public
