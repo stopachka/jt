@@ -5,7 +5,7 @@
             [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.tools.logging :as log]
-            [clojure.walk :refer [stringify-keys keywordize-keys]]
+            [jt.db :as db]
             [compojure.core :refer [defroutes GET POST]]
             [io.aviso.logging.setup]
             [mailgun.mail :as mail]
@@ -15,13 +15,9 @@
             [ring.middleware.keyword-params :refer [wrap-keyword-params]]
             [ring.middleware.params :refer [wrap-params]]
             [ring.util.response :refer [response]])
-  (:import (com.google.auth.oauth2 ServiceAccountCredentials)
-           (java.time LocalTime ZonedDateTime ZoneId Period Instant)
+  (:import (java.time LocalTime ZonedDateTime ZoneId Period Instant)
            (java.time.format DateTimeFormatter)
-           (com.google.firebase FirebaseApp FirebaseOptions$Builder)
-           (com.google.firebase.database FirebaseDatabase ValueEventListener DatabaseReference$CompletionListener DatabaseException)
-           (clojure.lang IDeref)))
-
+           (com.google.firebase.database DatabaseException)))
 
 ;; ------------------------------------------------------------------------------
 ;; Helpers
@@ -38,45 +34,6 @@
          (log/errorf "uh-oh, failed to run async function %s %s" '~forms e#)
          (throw e#)))))
 
-(defn throwable-promise
-  "clojure promises do not have a concept of reject.
-  this mimics the idea: you can pass a function, which receives
-  a resolve, and reject function
-
-  If you reject a promise, it will throw when de-referenced"
-  [f]
-  (let [p (promise)
-        resolve #(deliver p [nil %])
-        reject #(deliver p [% nil])
-        throwable-p (reify IDeref
-                      (deref [_this]
-                        (let [[err res] @p]
-                          (if err (throw err) res))))]
-    (f resolve reject)
-    throwable-p))
-
-(defprotocol ConvertibleToClojure
-  "Converts nested java objects to clojure objects.
-   This is useful when we fetch data from firebase.
-   Instead of working on mutable objects, we transform them
-   to keywordized immutable clojure ones"
-  (->clj [o]))
-
-(extend-protocol ConvertibleToClojure
-  java.util.Map
-  (->clj [o] (let [entries (.entrySet o)]
-               (reduce (fn [m [^String k v]]
-                         (assoc m (keyword k) (->clj v)))
-                       {} entries)))
-
-  java.util.List
-  (->clj [o] (vec (map ->clj o)))
-
-  java.lang.Object
-  (->clj [o] o)
-
-  nil
-  (->clj [_] nil))
 
 (defn read-edn-resource
   "Transforms a resource in our classpath to edn"
@@ -126,57 +83,11 @@
    {:auth {:uid "jt-sv"}
     :db-url "https://journaltogether.firebaseio.com"}})
 
-
 (def friends
   (:friends secrets))
 
 ;; ------------------------------------------------------------------------------
 ;; DB
-
-(defn firebase-init []
-  (let [{:keys [db-url auth]} (:firebase config)
-        {:keys
-         [client-id
-          client-email
-          private-key
-          private-key-id]} (:firebase secrets)
-        creds (ServiceAccountCredentials/fromPkcs8
-                client-id
-                client-email
-                private-key
-                private-key-id
-                [])
-        options (-> (FirebaseOptions$Builder.)
-                    (.setCredentials creds)
-                    (.setDatabaseUrl db-url)
-                    (.setDatabaseAuthVariableOverride
-                      (stringify-keys auth))
-                    .build)]
-    (FirebaseApp/initializeApp options)))
-
-(defn firebase-save [path v]
-  (throwable-promise
-    (fn [resolve reject]
-      (-> (FirebaseDatabase/getInstance)
-          (.getReference path)
-          (.setValue
-            (stringify-keys v)
-            (reify DatabaseReference$CompletionListener
-              (onComplete [_this err ref]
-                (if err (reject (.toException err))
-                        (resolve ref)))))))))
-
-(defn firebase-fetch [path]
-  (throwable-promise
-    (fn [resolve reject]
-      (-> (FirebaseDatabase/getInstance)
-          (.getReference path)
-          (.addListenerForSingleValueEvent
-            (reify ValueEventListener
-              (onDataChange [_this s]
-                (resolve (->> s .getValue ->clj)))
-              (onCancelled [_this err]
-                (reject (.toException err)))))))))
 
 (defn email->id [email]
   (-> email
@@ -304,7 +215,7 @@
   succeed, so only one worker can grab a task"
   [task-id]
   (try
-    @(firebase-save (task-path task-id) true)
+    @(db/firebase-save (task-path task-id) true)
     (log/infof "[task] grabbed %s" task-id)
     :grabbed
     (catch DatabaseException _e
@@ -323,7 +234,7 @@
     (when (try-grab-task! task-id)
       (let [entries (->> friends
                          (pmap (fn [email]
-                                 @(firebase-fetch
+                                 @(db/firebase-fetch
                                     (journal-path email day))))
                          (filter seq))]
         (if-not (seq entries)
@@ -359,14 +270,14 @@
   (let [{:keys [sender subject date]} data
         email (data->journal data)]
     (cond
-      (seq @(firebase-fetch (journal-path sender date)))
+      (seq @(db/firebase-fetch (journal-path sender date)))
       (do
         (log/infof "already have a journal recorded for %s on " sender date)
         (send-mail (content-already-received sender subject)))
 
       :else
       (do
-        (firebase-save (journal-path sender date) email)
+        (db/firebase-save (journal-path sender date) email)
         (send-mail (content-ack-receive sender subject))))))
 
 ;; ------------------------------------------------------------------------------
@@ -438,7 +349,7 @@
   (GET "*" [] fallback-handler))
 
 (defn -main []
-  (firebase-init)
+  (db/firebase-init config secrets)
   (fut-bg (chime-core/chime-at
             (reminder-period)
             handle-reminder))
