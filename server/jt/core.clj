@@ -398,5 +398,5 @@
                 wrap-params
                 (wrap-json-body {:keywords? true})
                 wrap-json-response)]
-    (jetty/run-jetty app {:port port :join false}))
+    (jetty/run-jetty app {:port port :join? false}))
   (log/info "kicked off!"))
