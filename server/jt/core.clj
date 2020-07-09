@@ -18,7 +18,7 @@
   (:import (java.time LocalTime ZonedDateTime ZoneId Period Instant)
            (java.time.format DateTimeFormatter)
            (com.google.firebase.database DatabaseException)
-           (com.google.firebase.auth FirebaseAuth UserRecord$CreateRequest)))
+           (com.google.firebase.auth FirebaseAuthException)))
 
 ;; ------------------------------------------------------------------------------
 ;; Helpers
@@ -32,7 +32,7 @@
      (try
        ~@forms
        (catch Exception e#
-         (log/errorf "uh-oh, failed to run async function %s %s" '~forms e#)
+         (log/errorf e# "uh-oh, failed to run async function %s" '~forms)
          (throw e#)))))
 
 
@@ -111,7 +111,8 @@
 (def mailgun-creds {:key (-> secrets :mailgun :api-key)
                     :domain (-> config :mailgun :domain)})
 
-(defn send-mail [content]
+(defn send-email [content]
+  (log/infof "[mail] sending content=%s" content)
   (mail/send-mail mailgun-creds content))
 
 ;; ------------------------------------------------------------------------------
@@ -158,6 +159,8 @@
   (email-with-name summary-email "Journal Summary"))
 
 (def signup-email "sign-up@mg.journaltogether.com")
+(def signup-email-with-name
+  (email-with-name signup-email "Journal Signup"))
 
 (defn content-hows-your-day? [day]
   {:from hows-your-day-email-with-name
@@ -194,19 +197,44 @@
                (map journal-entry->html)
                str/join))}))
 
-(defn content-ack-receive [email, subject]
+(defn content-ack-receive [to, subject]
   {:from hows-your-day-email-with-name
-   :to [email]
+   :to to
    :subject subject
    :html "Oky doke, received this 👌"})
 
-(defn content-already-received [email, subject]
+(defn content-already-received [to, subject]
   {:from hows-your-day-email-with-name
-   :to [email]
+   :to to
    :subject subject
    :html (str
            "<p>Oi, I already logged a journal entry for you.</p>"
            "<p>I can't do much with this. Ping Stopa sry 🙈</p>")})
+
+(defn home-url [uid]
+  (str "https://www.journaltogether.com/u/" uid))
+
+(defn content-created-user [to subject uid]
+  {:from signup-email-with-name
+   :to to
+   :subject subject
+   :html
+   (str
+     "<p>Welcome to Journal Together!</p>
+     Visit "
+     (home-url uid)
+     "to get started")})
+
+(defn content-requested-user-info [to subject uid]
+  {:from signup-email-with-name
+   :to to
+   :subject subject
+   :html
+   (str
+     "<p>Great to see you!</p>
+     Visit "
+     (home-url uid)
+     "to manage your profile")})
 
 ;; ------------------------------------------------------------------------------
 ;; Outgoing Mail
@@ -228,7 +256,7 @@
   (let [day (pst-now)
         task-id (str "reminder-" (->numeric-date-str day))]
     (when (try-grab-task! task-id)
-      (send-mail (content-hows-your-day? (pst-now))))))
+      (send-email (content-hows-your-day? (pst-now))))))
 
 (defn handle-summary [_]
   (let [day (.minusDays (pst-now) 1)
@@ -241,7 +269,7 @@
                          (filter seq))]
         (if-not (seq entries)
           (log/infof "skipping for %s because there are no entries" day)
-          (send-mail (content-summary day entries)))))))
+          (send-email (content-summary day entries)))))))
 
 ;; ------------------------------------------------------------------------------
 ;; Incoming Mail
@@ -273,26 +301,25 @@
         email (data->journal data)]
     (cond
       (seq @(db/firebase-fetch (journal-path sender date)))
-      (do
-        (log/infof "already have a journal recorded for %s on " sender date)
-        (send-mail (content-already-received sender subject)))
+      (send-email (content-already-received sender subject))
 
       :else
       (do
         (db/firebase-save (journal-path sender date) email)
-        (send-mail (content-ack-receive sender subject))))))
+        (send-email (content-ack-receive sender subject))))))
 
 ;; ------------------------------------------------------------------------------
 ;; handle-signup
 
 (defn handle-signup-response [data]
-  (let [{:keys [sender]} data]
-    (-> (FirebaseAuth/getInstance)
-        (.createUser (-> (UserRecord$CreateRequest.)
-                         (.setEmail sender)
-                         (.setEmailVerified true))))))
-(comment
-  (handle-signup-response {:sender "stepan.p@gmail.com"}))
+  (let [{:keys [sender subject]} data]
+    (try
+      (let [{:keys [uid]} (db/create-user! sender)]
+        (send-email (content-created-user sender subject uid)))
+      (catch FirebaseAuthException e
+        (if-let [{:keys [uid]} (db/get-user-by-email! sender)]
+          (send-email (content-requested-user-info sender subject uid))
+          (log/warnf e "uh oh, failed to fetch %s" sender))))))
 
 ;; ------------------------------------------------------------------------------
 ;; emails-handler
@@ -358,7 +385,7 @@
   (GET "*" [] fallback-handler))
 
 (defn -main []
-  (db/firebase-init config secrets)
+  (db/init config secrets)
   (fut-bg (chime-core/chime-at
             (reminder-period)
             handle-reminder))

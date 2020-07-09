@@ -6,7 +6,8 @@
              FirebaseDatabase
              ValueEventListener
              DatabaseReference$CompletionListener)
-           (clojure.lang IDeref)))
+           (clojure.lang IDeref)
+           (com.google.firebase.auth UserRecord FirebaseAuth UserRecord$CreateRequest)))
 
 (defprotocol ConvertibleToClojure
   "Converts nested java objects to clojure objects.
@@ -31,7 +32,7 @@
   nil
   (->clj [_] nil))
 
-(defn throwable-promise
+(defn- throwable-promise
   "clojure promises do not have a concept of reject.
   this mimics the idea: you can pass a function, which receives
   a resolve, and reject function
@@ -72,7 +73,29 @@
               (onCancelled [_this err]
                 (reject (.toException err)))))))))
 
-(defn firebase-init [config secrets]
+;; ------------------------------------------------------------------------------
+;; users
+
+(defn- user-record->map [^UserRecord x]
+  {:uid (.getUid x)
+   :email (.getEmail x)})
+
+(defn create-user! [email]
+  (-> (FirebaseAuth/getInstance)
+      (.createUser (-> (UserRecord$CreateRequest.)
+                       (.setEmail email)
+                       (.setEmailVerified true)))
+      user-record->map))
+
+(defn get-user-by-email! [email]
+  (-> (FirebaseAuth/getInstance)
+      (.getUserByEmail email)
+      user-record->map))
+
+;; ------------------------------------------------------------------------------
+;; init
+
+(defn init [config secrets]
   (let [{:keys [db-url auth project-id]} (:firebase config)
         {:keys
          [client-id
