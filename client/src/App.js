@@ -1,10 +1,40 @@
 import React from "react";
 import "./App.css";
+import { withRouter } from "react-router"
 import { BrowserRouter as Router, Switch, Route } from "react-router-dom";
+import * as firebase from 'firebase/app';
 
-function Account() { 
-  return <h1>Welcome to the account page!</h1>
+// Set up Firebase
+import 'firebase/auth';
+import 'firebase/database';
+firebase.initializeApp({
+  apiKey: "AIzaSyCBl-YAARDZuf0KcTIOTcmUZjynaKC7puc",
+  authDomain: "journaltogether.firebaseapp.com",
+  databaseURL: "https://journaltogether.firebaseio.com",
+  projectId: "journaltogether",
+  storageBucket: "journaltogether.appspot.com",
+  messagingSenderId: "625725315087",
+  appId: "1:625725315087:web:a946ce7cf0725381df2b7a",
+  measurementId: "G-GYBL76DZQW"
+});
+
+class AccountComp extends React.Component {
+  constructor(props) {
+    super(props);
+  }
+
+  componentDidMount() {
+    // Ask server to auth user
+    // get token and validate firebase
+    // listen to changes for firebase
+  }
+
+  render() {
+    return <h1>Welcome to the account page!</h1>
+  }
 }
+
+const Account = withRouter(AccountComp);
 
 function Home() {
   return (
