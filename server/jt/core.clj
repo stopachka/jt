@@ -17,7 +17,8 @@
             [ring.util.response :refer [response]])
   (:import (java.time LocalTime ZonedDateTime ZoneId Period Instant)
            (java.time.format DateTimeFormatter)
-           (com.google.firebase.database DatabaseException)))
+           (com.google.firebase.database DatabaseException)
+           (com.google.firebase.auth FirebaseAuth UserRecord$CreateRequest)))
 
 ;; ------------------------------------------------------------------------------
 ;; Helpers
@@ -81,6 +82,7 @@
    :mailgun {:domain "mg.journaltogether.com"}
    :firebase
    {:auth {:uid "jt-sv"}
+    :project-id "journaltogether"
     :db-url "https://journaltogether.firebaseio.com"}})
 
 (def friends
@@ -283,7 +285,14 @@
 ;; ------------------------------------------------------------------------------
 ;; handle-signup
 
-(defn handle-signup-response [data])
+(defn handle-signup-response [data]
+  (let [{:keys [sender]} data]
+    (-> (FirebaseAuth/getInstance)
+        (.createUser (-> (UserRecord$CreateRequest.)
+                         (.setEmail sender)
+                         (.setEmailVerified true))))))
+(comment
+  (handle-signup-response {:sender "stepan.p@gmail.com"}))
 
 ;; ------------------------------------------------------------------------------
 ;; emails-handler

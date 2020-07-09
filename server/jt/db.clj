@@ -73,7 +73,7 @@
                 (reject (.toException err)))))))))
 
 (defn firebase-init [config secrets]
-  (let [{:keys [db-url auth]} (:firebase config)
+  (let [{:keys [db-url auth project-id]} (:firebase config)
         {:keys
          [client-id
           client-email
@@ -87,6 +87,7 @@
                 [])
         options (-> (FirebaseOptions$Builder.)
                     (.setCredentials creds)
+                    (.setProjectId project-id)
                     (.setDatabaseUrl db-url)
                     (.setDatabaseAuthVariableOverride
                       (stringify-keys auth))
