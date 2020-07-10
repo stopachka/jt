@@ -220,8 +220,6 @@
      (url-with-magic-code magic-code)
      " to get started")})
 
-
-
 ;; ------------------------------------------------------------------------------
 ;; Outgoing Mail
 
