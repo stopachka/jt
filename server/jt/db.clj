@@ -7,8 +7,7 @@
              FirebaseDatabase
              ValueEventListener
              DatabaseReference$CompletionListener DatabaseReference)
-           (clojure.lang IDeref)
-           (com.google.firebase.auth UserRecord FirebaseAuth UserRecord$CreateRequest)))
+           (com.google.firebase.auth UserRecord FirebaseAuth UserRecord$CreateRequest FirebaseAuthException)))
 
 (defprotocol ConvertibleToClojure
   "Converts nested java objects to clojure objects.
@@ -76,9 +75,14 @@
       user-record->map))
 
 (defn get-user-by-email! [email]
-  (-> (FirebaseAuth/getInstance)
-      (.getUserByEmail email)
-      user-record->map))
+  (try
+    (-> (FirebaseAuth/getInstance)
+        (.getUserByEmail email)
+        user-record->map)
+    (catch FirebaseAuthException e
+      (if (= (.getErrorCode e) "user-not-found")
+        nil
+        (throw e)))))
 
 (defn get-user-by-uid! [uid]
   (-> (FirebaseAuth/getInstance)
