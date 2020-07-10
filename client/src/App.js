@@ -29,47 +29,13 @@ class MeComp extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      isAuthenticating: true,
       isLoading: true,
       isLoggedIn: null,
-      errorMessage: null,
     };
   }
 
   componentDidMount() {
     window.signOut = () => firebase.auth().signOut();
-    this.handleMagicCode();
-    this.listenToAuth();
-  }
-
-  handleMagicCode() {
-    const code = qs.parse(this.props.location.search, {
-      ignoreQueryPrefix: true,
-    })["mc"];
-    if (!code) {
-      this.setState({ isAuthenticating: false });
-      return;
-    }
-    fetch(serverPath("api/auth"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ "magic-code": code }),
-    })
-      .then((x) => (x.status === 200 ? x.json() : Promise.reject("uh oh")))
-      .then(({ token }) => firebase.auth().signInWithCustomToken(token))
-      .then(
-        () => {
-          this.setState({ isAuthenticating: false });
-        },
-        () => {
-          this.setState({
-            isAuthenticating: false,
-            errorMessage: "Uh oh. failed to log in please ping Stopa",
-          });
-        }
-      );
-  }
-  listenToAuth() {
     firebase.auth().onAuthStateChanged((user) => {
       this.setState({
         isLoading: false,
@@ -77,17 +43,10 @@ class MeComp extends React.Component {
       });
     });
   }
+
   render() {
-    const {
-      isLoading,
-      isAuthenticating,
-      isLoggedIn,
-      errorMessage,
-    } = this.state;
-    if (errorMessage) {
-      return <div>Uh oh we got an error</div>;
-    }
-    if (isLoading || isAuthenticating) {
+    const { isLoading, isLoggedIn } = this.state;
+    if (isLoading) {
       return <div>Loading...</div>;
     }
     if (!isLoggedIn) {
@@ -98,6 +57,55 @@ class MeComp extends React.Component {
 }
 
 const Me = withRouter(MeComp);
+
+class MagicAuthComp extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      isLoading: true,
+      errorMessage: null,
+    };
+  }
+
+  componentDidMount() {
+    const { code } = this.props.match.params;
+    fetch(serverPath("api/auth"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    })
+      .then((x) => (x.status === 200 ? x.json() : Promise.reject("uh oh")))
+      .then(({ token }) => firebase.auth().signInWithCustomToken(token))
+      .then(
+        () => {
+          this.setState({ isLoading: false }, () =>
+            window.setTimeout(() => {
+              this.props.history.push("/me");
+            }, 1000)
+          );
+        },
+        () => {
+          this.setState({
+            isLoading: false,
+            errorMessage: "Uh oh. failed to log in please ping Stopa",
+          });
+        }
+      );
+  }
+
+  render() {
+    const { isLoading, errorMessage } = this.state;
+    if (errorMessage) {
+      return <div>{errorMessage}</div>;
+    }
+    if (isLoading) {
+      return <div>Loading...</div>;
+    }
+    return <div>Magic Link worked!</div>;
+  }
+}
+
+const MagicAuth = withRouter(MagicAuthComp);
 
 function Home() {
   return (
@@ -137,6 +145,9 @@ class App extends React.Component {
           <Switch>
             <Route path="/me">
               <Me />
+            </Route>
+            <Route path="/magic/:code">
+              <MagicAuth />
             </Route>
             <Route path="/">
               <Home />

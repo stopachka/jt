@@ -325,8 +325,8 @@
 ;; auth
 
 (defn auth-handler [{:keys [body] :as _req}]
-  (let [{:keys [magic-code]} body
-        {:keys [email]} @(db/consume-magic-code magic-code)]
+  (let [{:keys [code]} body
+        {:keys [email]} @(db/consume-magic-code code)]
     (cond
       (nil? email)
       (bad-request {:reason "could not consume magic code"})
