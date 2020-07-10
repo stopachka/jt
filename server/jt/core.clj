@@ -204,7 +204,7 @@
 (defn url-with-magic-code [magic-code]
   (str "https://www.journaltogether.com/mc-auth?mc=" magic-code))
 
-(defn content-created-user [to subject uid]
+(defn content-signup-response [to subject magic-code]
   {:from signup-email-with-name
    :to to
    :subject subject
@@ -212,19 +212,10 @@
    (str
      "<p>Welcome to Journal Together!</p>
      Visit "
-     (url-with-magic-code uid)
+     (url-with-magic-code magic-code)
      "to get started")})
 
-(defn content-requested-user-info [to subject uid]
-  {:from signup-email-with-name
-   :to to
-   :subject subject
-   :html
-   (str
-     "<p>Great to see you!</p>
-     Visit "
-     (url-with-magic-code uid)
-     "to manage your profile")})
+
 
 ;; ------------------------------------------------------------------------------
 ;; Outgoing Mail
@@ -303,13 +294,7 @@
 
 (defn handle-signup-response [data]
   (let [{:keys [sender subject]} data]
-    (try
-      (let [{:keys [uid]} (db/create-user! sender)]
-        (send-email (content-created-user sender subject (db/create-magic-code! uid))))
-      (catch FirebaseAuthException e
-        (if-let [{:keys [uid]} (db/get-user-by-email! sender)]
-          (send-email (content-requested-user-info sender subject (db/create-magic-code! uid)))
-          (log/warnf e "uh oh, failed to fetch %s" sender))))))
+    (send-email (content-signup-response sender subject (db/create-magic-code! sender)))))
 
 ;; ------------------------------------------------------------------------------
 ;; emails-handler
@@ -341,10 +326,15 @@
 
 (defn auth-handler [{:keys [body] :as _req}]
   (let [{:keys [magic-code]} body
-        {:keys [uid]} @(db/consume-magic-code magic-code)]
-    (if (seq uid)
-      (response {:token (db/create-token-for-uid! uid)})
-      (bad-request {:reason "could not validate magic code"}))))
+        {:keys [email]} @(db/consume-magic-code magic-code)]
+    (cond
+      (nil? email)
+      (bad-request {:reason "could not consume magic code"})
+
+      :else
+      (let [{:keys [uid]} (or (db/get-user-by-email! email)
+                              (db/create-user! email))]
+        (response {:token (db/create-token-for-uid! uid)})))))
 
 ;; ------------------------------------------------------------------------------
 ;; Server

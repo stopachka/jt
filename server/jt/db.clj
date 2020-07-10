@@ -95,11 +95,11 @@
 (def magic-code-root "/magic-codes/")
 (defn- magic-code-path [code] (str magic-code-root code))
 
-(defn create-magic-code! [uid]
+(defn create-magic-code! [email]
   (let [key (-> (firebase-ref magic-code-root)
                 .push
                 (firebase-save {:at (str (System/currentTimeMillis))
-                                :uid uid})
+                                :email email})
                 deref
                 .getKey)]
     {:key key}))
