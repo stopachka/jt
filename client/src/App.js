@@ -3,7 +3,6 @@ import "./App.css";
 import { withRouter } from "react-router";
 import { BrowserRouter as Router, Switch, Route } from "react-router-dom";
 import * as firebase from "firebase/app";
-import qs from "qs";
 
 // Set up Firebase
 import "firebase/auth";
@@ -85,15 +84,53 @@ class SignIn extends React.Component {
   }
 }
 
-class ProfileHome extends React.Component { 
+class ProfileHome extends React.Component {
   constructor(props) {
     super(props);
-    this.state = {}
+    this.state = {
+      idToGroup: {},
+    };
+    this._idToGroupRef = {};
+    this._userGroupIdsRef = firebase
+      .database()
+      .ref(`/users/${firebase.auth().currentUser.uid}/groups`);
   }
-  render() { 
-    return (
-      <div>Home!</div>
-    )
+  componentDidMount() {
+    const updateGroups = (f) => {
+      this.setState(({ idToGroup }) => ({
+        idToGroup: f(idToGroup),
+      }));
+    };
+    const onGroup = (snap) => {
+      updateGroups((oldGroups) => ({ ...oldGroups, [snap.key]: snap.val() }));
+    };
+    this._userGroupIdsRef.on("child_added", (snap) => {
+      const groupId = snap.key;
+      if (this._idToGroupRef[groupId]) return;
+      const newRef = firebase.database().ref(`/groups/${groupId}/`);
+      newRef.on("value", onGroup);
+      this._idToGroupRef[groupId] = newRef;
+    });
+    this._userGroupIdsRef.on("child_removed", (snap) => {
+      const groupId = snap.key;
+      if (!this._idToGroupRef[groupId]) return;
+      this._idToGroupRef[groupId].off();
+      delete this._idToGroupRef[groupId];
+      updateGroups((oldGroups) => {
+        const res = { ...oldGroups };
+        delete res[groupId];
+        return res;
+      });
+    });
+  }
+  
+  componentWillUnmount() {
+    this._userGroupIdsRef.off();
+    Object.values(this._idToGroupRef).forEach(ref => ref.off());
+  }
+
+  render() {
+    return <div>{JSON.stringify(this.state)}</div>;
   }
 }
 
@@ -130,7 +167,7 @@ class MeComp extends React.Component {
           <ProfileHome />
         </Route>
       </Switch>
-    )
+    );
   }
 }
 

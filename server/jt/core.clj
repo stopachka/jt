@@ -218,7 +218,7 @@
      "<p>Welcome to Journal Together!</p>
      Visit "
      (url-with-magic-code magic-code)
-     "to get started")})
+     " to get started")})
 
 
 
