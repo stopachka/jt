@@ -6,6 +6,7 @@
             [clojure.string :as str]
             [clojure.tools.logging :as log]
             [jt.db :as db]
+            [jt.concurrency :refer [fut-bg]]
             [compojure.core :refer [defroutes GET POST]]
             [compojure.route :refer [resources]]
             [io.aviso.logging.setup]
@@ -23,19 +24,6 @@
 
 ;; ------------------------------------------------------------------------------
 ;; Helpers
-
-(defmacro fut-bg
-  "Futures only throw when de-referenced. fut-bg writes a future
-  with a top-level try-catch, so you can run code asynchronously,
-  without _ever_ de-referencing them"
-  [& forms]
-  `(future
-     (try
-       ~@forms
-       (catch Exception e#
-         (log/errorf e# "uh-oh, failed to run async function %s" '~forms)
-         (throw e#)))))
-
 
 (defn read-edn-resource
   "Transforms a resource in our classpath to edn"
@@ -353,10 +341,9 @@
 
 (defn auth-handler [{:keys [body] :as _req}]
   (let [{:keys [magic-code]} body
-        {:keys [uid]} @(db/get-magic-code magic-code)]
+        {:keys [uid]} @(db/consume-magic-code magic-code)]
     (if (seq uid)
-      (do (fut-bg @(db/kill-magic-code magic-code))
-          (response {:token (db/create-token-for-uid! uid)}))
+      (response {:token (db/create-token-for-uid! uid)})
       (bad-request {:reason "could not validate magic code"}))))
 
 ;; ------------------------------------------------------------------------------

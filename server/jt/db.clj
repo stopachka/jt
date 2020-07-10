@@ -1,5 +1,6 @@
 (ns jt.db
-  (:require [clojure.walk :refer [stringify-keys]])
+  (:require [jt.concurrency :refer [fut-bg throwable-promise]]
+            [clojure.walk :refer [stringify-keys]])
   (:import (com.google.auth.oauth2 ServiceAccountCredentials)
            (com.google.firebase FirebaseOptions$Builder FirebaseApp)
            (com.google.firebase.database
@@ -32,22 +33,6 @@
   nil
   (->clj [_] nil))
 
-(defn- throwable-promise
-  "clojure promises do not have a concept of reject.
-  this mimics the idea: you can pass a function, which receives
-  a resolve, and reject function
-
-  If you reject a promise, it will throw when de-referenced"
-  [f]
-  (let [p (promise)
-        resolve #(deliver p [nil %])
-        reject #(deliver p [% nil])
-        throwable-p (reify IDeref
-                      (deref [_this]
-                        (let [[err res] @p]
-                          (if err (throw err) res))))]
-    (f resolve reject)
-    throwable-p))
 
 (defn firebase-ref [path]
   (-> (FirebaseDatabase/getInstance)
@@ -119,11 +104,17 @@
                 .getKey)]
     {:key key}))
 
-(defn get-magic-code [code]
+(defn- get-magic-code [code]
   (firebase-fetch (magic-code-path code)))
 
-(defn kill-magic-code [code]
+(defn- kill-magic-code [code]
   (firebase-save (firebase-ref (magic-code-path code)) nil))
+
+(defn consume-magic-code [code]
+  (future
+    (when-let [res @(get-magic-code code)]
+      (fut-bg @(kill-magic-code code))
+      res)))
 
 ;; ------------------------------------------------------------------------------
 ;; init
