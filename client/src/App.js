@@ -85,6 +85,18 @@ class SignIn extends React.Component {
   }
 }
 
+class ProfileHome extends React.Component { 
+  constructor(props) {
+    super(props);
+    this.state = {}
+  }
+  render() { 
+    return (
+      <div>Home!</div>
+    )
+  }
+}
+
 class MeComp extends React.Component {
   constructor(props) {
     super(props);
@@ -112,7 +124,13 @@ class MeComp extends React.Component {
     if (!isLoggedIn) {
       return <SignIn />;
     }
-    return <h1>You are looged in!</h1>;
+    return (
+      <Switch>
+        <Route path="/">
+          <ProfileHome />
+        </Route>
+      </Switch>
+    )
   }
 }
 
