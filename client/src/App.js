@@ -123,14 +123,34 @@ class ProfileHome extends React.Component {
       });
     });
   }
-  
+
   componentWillUnmount() {
     this._userGroupIdsRef.off();
-    Object.values(this._idToGroupRef).forEach(ref => ref.off());
+    Object.values(this._idToGroupRef).forEach((ref) => ref.off());
   }
 
   render() {
-    return <div>{JSON.stringify(this.state)}</div>;
+    const { idToGroup } = this.state;
+    return (
+      <div>
+        <h2>Groups</h2>
+        {Object.entries(idToGroup).map(([k, g]) => {
+          return (
+            <div key={k}>
+              <h4>{g.name}</h4>
+              <div>
+                {g.users &&
+                  Object.values(g.users).map((u) => {
+                    return (
+                      <p key={u.email}>{u.email}</p>
+                    );
+                  })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
   }
 }
 
@@ -193,11 +213,7 @@ class MagicAuthComp extends React.Component {
       .then(({ token }) => firebase.auth().signInWithCustomToken(token))
       .then(
         () => {
-          this.setState({ isLoading: false }, () =>
-            window.setTimeout(() => {
-              this.props.history.push("/me");
-            }, 1000)
-          );
+          this.props.history.push("/me");
         },
         () => {
           this.setState({
