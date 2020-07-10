@@ -25,6 +25,66 @@ function serverPath(path) {
   return `${root}/${path}`;
 }
 
+class SignIn extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      hasRequestedCode: false,
+      errorMessage: null,
+    };
+  }
+  render() {
+    const { hasRequestedCode, errorMessage } = this.state;
+    if (hasRequestedCode) {
+      return (
+        <div>
+          <h1>Nice! Okay check your email</h1>
+        </div>
+      );
+    }
+    return (
+      <div>
+        {errorMessage && <h3>{errorMessage}</h3>}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const email = this._emailInput.value;
+            fetch(serverPath("api/magic/request"), {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email }),
+            })
+              .then((x) =>
+                x.status === 200 ? x.json() : Promise.reject("uh oh")
+              )
+              .then(
+                () => {
+                  this.setState({ hasRequestedCode: true });
+                },
+                () => {
+                  this.setState({
+                    hasRequestedCode: true,
+                    errorMessage:
+                      "Uh oh. failed to send you an email. Plz ping Stopa",
+                  });
+                }
+              );
+          }}
+        >
+          <input
+            type="email"
+            placeholder="Enter your email"
+            ref={(ref) => {
+              this._emailInput = ref;
+            }}
+          />
+          <button type="submit">Send me a magic code!</button>
+        </form>
+      </div>
+    );
+  }
+}
+
 class MeComp extends React.Component {
   constructor(props) {
     super(props);
@@ -50,7 +110,7 @@ class MeComp extends React.Component {
       return <div>Loading...</div>;
     }
     if (!isLoggedIn) {
-      return <div>Log in!</div>;
+      return <SignIn />;
     }
     return <h1>You are looged in!</h1>;
   }
@@ -69,7 +129,7 @@ class MagicAuthComp extends React.Component {
 
   componentDidMount() {
     const { code } = this.props.match.params;
-    fetch(serverPath("api/auth"), {
+    fetch(serverPath("api/magic/auth"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code }),

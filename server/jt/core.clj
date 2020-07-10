@@ -33,6 +33,11 @@
       slurp
       edn/read-string))
 
+(def email-pattern #"(?i)[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?")
+(defn email?
+  [email]
+  (and (string? email) (boolean (re-matches email-pattern email))))
+
 ;; ------------------------------------------------------------------------------
 ;; Date Helpers
 
@@ -202,12 +207,12 @@
            "<p>I can't do much with this. Ping Stopa sry 🙈</p>")})
 
 (defn url-with-magic-code [magic-code]
-  (str "https://www.journaltogether.com/mc-auth?mc=" magic-code))
+  (str "https://www.journaltogether.com/magic/" magic-code))
 
-(defn content-signup-response [to subject magic-code]
+(defn content-magic-code-response [to magic-code]
   {:from signup-email-with-name
    :to to
-   :subject subject
+   :subject "Here's how to sign into JournalTogether"
    :html
    (str
      "<p>Welcome to Journal Together!</p>
@@ -290,26 +295,16 @@
         (send-email (content-ack-receive sender subject))))))
 
 ;; ------------------------------------------------------------------------------
-;; handle-signup
-
-(defn handle-signup-response [data]
-  (let [{:keys [sender subject]} data]
-    (send-email (content-signup-response sender subject (db/create-magic-code! sender)))))
-
-;; ------------------------------------------------------------------------------
 ;; emails-handler
 
 (defn emails-handler [{:keys [params] :as req}]
   (fut-bg
-    (let [{:keys [recipient sender] :as data}
+    (let [{:keys [recipient sender subject] :as data}
           (-> params
               (assoc :date (parse-email-date params)))]
       (condp = recipient
         hows-your-day-email
         (handle-hows-your-day-response! data)
-
-        signup-email
-        (handle-signup-response data)
 
         :else
         (log/infof "skipping for recipient=%s sender=%s" recipient sender))))
@@ -322,9 +317,19 @@
     _res))
 
 ;; ------------------------------------------------------------------------------
-;; auth
+;; magic codes
 
-(defn auth-handler [{:keys [body] :as _req}]
+(defn magic-request-handler [{:keys [body] :as _req}]
+  (let [{:keys [email]} body]
+    (cond
+      (not (email? email))
+      (bad-request {:reason "invalid email"})
+
+      :else
+      (do (send-email (content-magic-code-response email (:key (db/create-magic-code! email))))
+          (response {:receive true})))))
+
+(defn magic-auth-handler [{:keys [body] :as _req}]
   (let [{:keys [code]} body
         {:keys [email]} @(db/consume-magic-code code)]
     (cond
@@ -353,7 +358,8 @@
 (defroutes
   routes
   (POST "/api/emails" [] emails-handler)
-  (POST "/api/auth" [] auth-handler)
+  (POST "/api/magic/request" [] magic-request-handler)
+  (POST "/api/magic/auth" [] magic-auth-handler)
 
   ;; static assets
   (resources "/" {:root static-root})
