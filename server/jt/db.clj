@@ -63,7 +63,7 @@
 ;; ------------------------------------------------------------------------------
 ;; users
 
-(defn- user-record->map [^UserRecord x]
+(defn- user-record->map [x]
   {:uid (.getUid x)
    :email (.getEmail x)})
 
@@ -92,6 +92,11 @@
 (defn create-token-for-uid! [uid]
   (-> (FirebaseAuth/getInstance)
       (.createCustomToken uid)))
+
+(defn user-from-id-token! [token]
+ (-> (FirebaseAuth/getInstance)
+     (.verifyIdToken token)
+     user-record->map))
 
 ;; ------------------------------------------------------------------------------
 ;; magic codes

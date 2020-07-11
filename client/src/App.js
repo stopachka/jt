@@ -57,14 +57,12 @@ class SignIn extends React.Component {
               .then((x) =>
                 x.status === 200 ? x.json() : Promise.reject("uh oh")
               )
-              .catch(
-                () => {
-                  this.setState({
-                    errorMessage:
-                      "Uh oh. failed to send you an email. Plz ping Stopa",
-                  });
-                }
-              );
+              .catch(() => {
+                this.setState({
+                  errorMessage:
+                    "Uh oh. failed to send you an email. Plz ping Stopa",
+                });
+              });
           }}
         >
           <input
@@ -85,6 +83,7 @@ class ProfileHome extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
+      errorMessage: null,
       idToGroup: {},
     };
     this._idToGroupRef = {};
@@ -138,25 +137,50 @@ class ProfileHome extends React.Component {
               <div>
                 {g.users &&
                   Object.values(g.users).map((u) => {
-                    return (
-                      <p key={u.email}>{u.email}</p>
-                    );
+                    return <p key={u.email}>{u.email}</p>;
                   })}
               </div>
               <br />
             </div>
           );
         })}
-        <form 
-          onSubmit={e => {
+        <form
+          onSubmit={(e) => {
             e.preventDefault();
-            const groupName = this._groupNameInput.value;
-            // TODO send a "create-group" event
-          }}>
-          <input
-            label="group name"
-            ref={x => this._groupNameInput = x}
-          />
+            const name = this._groupNameInput.value;
+            this._groupNameInput.value = "";
+            firebase
+              .auth()
+              .currentUser.getIdToken()
+              .then((token) => {
+                fetch(serverPath("api/sync"), {
+                  method: "POST",
+                  headers: {
+                    token,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    type: "create-group",
+                    data: { name },
+                  }),
+                })
+                  .then((x) => {
+                    debugger;
+                    return x.status === 200
+                      ? x.json()
+                      : Promise.reject(x.json());
+                  })
+                  .catch((err) => {
+                    debugger;
+                    this.setState({
+                      errorMessage:
+                        "Uh oh, failed to create a group. plz ping stopa",
+                    });
+                  });
+              });
+          }}
+        >
+          <input label="group name" ref={(x) => (this._groupNameInput = x)} />
           <button type="submit">create a group</button>
         </form>
       </div>

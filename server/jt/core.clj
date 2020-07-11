@@ -342,17 +342,16 @@
 ;; ------------------------------------------------------------------------------
 ;; sync
 
-(defn handle-sync [{:keys [body headers] :as _req}]
+(defn sync-handler [{:keys [body headers] :as _req}]
   (let [{:keys [type data]} body
         token (get headers "token")
-        user (-> (FirebaseAuth/getInstance)
-                 (.verifyIdToken token)
-                 db/user-record->map)
+        user (db/user-from-id-token! token)
         res (condp = (keyword type)
               :create-group
               (let [{:keys [name]} data]
-                @(db/create-group name user)))]
-    {:res res}))
+                @(db/create-group name user)
+                :done))]
+    (response {:res res})))
 
 ;; ------------------------------------------------------------------------------
 ;; Server
@@ -371,9 +370,11 @@
 (defroutes
   routes
   (POST "/api/emails" [] emails-handler)
+
   (POST "/api/magic/request" [] magic-request-handler)
   (POST "/api/magic/auth" [] magic-auth-handler)
 
+  (POST "/api/sync" [] sync-handler)
   ;; static assets
   (resources "/" {:root static-root})
   (GET "*" [] (render-static-file "index.html")))
