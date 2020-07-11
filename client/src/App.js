@@ -48,6 +48,7 @@ class SignIn extends React.Component {
           onSubmit={(e) => {
             e.preventDefault();
             const email = this._emailInput.value;
+            this.setState({ hasRequestedCode: true });
             fetch(serverPath("api/magic/request"), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -56,13 +57,9 @@ class SignIn extends React.Component {
               .then((x) =>
                 x.status === 200 ? x.json() : Promise.reject("uh oh")
               )
-              .then(
-                () => {
-                  this.setState({ hasRequestedCode: true });
-                },
+              .catch(
                 () => {
                   this.setState({
-                    hasRequestedCode: true,
                     errorMessage:
                       "Uh oh. failed to send you an email. Plz ping Stopa",
                   });
@@ -146,9 +143,22 @@ class ProfileHome extends React.Component {
                     );
                   })}
               </div>
+              <br />
             </div>
           );
         })}
+        <form 
+          onSubmit={e => {
+            e.preventDefault();
+            const groupName = this._groupNameInput.value;
+            // TODO send a "create-group" event
+          }}>
+          <input
+            label="group name"
+            ref={x => this._groupNameInput = x}
+          />
+          <button type="submit">create a group</button>
+        </form>
       </div>
     );
   }
