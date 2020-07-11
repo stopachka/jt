@@ -20,7 +20,7 @@
   (:import (java.time LocalTime ZonedDateTime ZoneId Period Instant)
            (java.time.format DateTimeFormatter)
            (com.google.firebase.database DatabaseException)
-           (com.google.firebase.auth FirebaseAuthException)))
+           (com.google.firebase.auth FirebaseAuthException FirebaseAuth)))
 
 ;; ------------------------------------------------------------------------------
 ;; Helpers
@@ -338,6 +338,21 @@
       (let [{:keys [uid]} (or (db/get-user-by-email! email)
                               (db/create-user! email))]
         (response {:token (db/create-token-for-uid! uid)})))))
+
+;; ------------------------------------------------------------------------------
+;; sync
+
+(defn handle-sync [{:keys [body headers] :as _req}]
+  (let [{:keys [type data]} body
+        token (get headers "token")
+        user (-> (FirebaseAuth/getInstance)
+                 (.verifyIdToken token)
+                 db/user-record->map)
+        res (condp = (keyword type)
+              :create-group
+              (let [{:keys [name]} data]
+                @(db/create-group name user)))]
+    {:res res}))
 
 ;; ------------------------------------------------------------------------------
 ;; Server
