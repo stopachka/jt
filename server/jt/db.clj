@@ -121,6 +121,46 @@
       res)))
 
 ;; ------------------------------------------------------------------------------
+;; groups
+
+(defn create-group [group-name {:keys [uid email] :as _user}]
+  (let [group-ref (-> (firebase-ref "/groups")
+                      .push)
+        group-id (.getKey group-ref)
+        save-group-fut (firebase-save
+                         group-ref
+                         {:name group-name
+                          :users {uid {:email email}}})
+        update-user-fut (firebase-save
+                          (firebase-ref (str "/users/" uid "/groups/" group-id))
+                          true)]
+    (future
+      @save-group-fut
+      @update-user-fut)))
+
+(defn remove-member-from-group [group-id uid]
+  (let [remove-from-group-fut (firebase-save
+                                (firebase-ref (str "/groups/" group-id "/users/" uid))
+                                nil)
+        remove-from-user-fut (firebase-save
+                               (firebase-ref (str "/users/" uid "/groups/" group-id))
+                               nil)]
+    (future
+      @remove-from-group-fut
+      @remove-from-user-fut)))
+
+(defn add-member-to-group [group-id {:keys [uid email]}]
+  (let [add-user-to-group-fut (firebase-save
+                                (firebase-ref (str "/groups/" group-id "/users/" uid))
+                                {:email email})
+        add-group-to-user-fut (firebase-save
+                                (firebase-ref (str "/users/" uid "/groups/" group-id))
+                                nil)]
+    (future
+      @add-user-to-group-fut
+      @add-group-to-user-fut)))
+
+;; ------------------------------------------------------------------------------
 ;; init
 
 (defn init [config secrets]

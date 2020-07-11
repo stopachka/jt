@@ -182,11 +182,16 @@ class MeComp extends React.Component {
       return <SignIn />;
     }
     return (
-      <Switch>
-        <Route path="/">
-          <ProfileHome />
-        </Route>
-      </Switch>
+      <div>
+        <button>Journals</button>
+        <button>Account</button>
+        <button onClick={() => firebase.auth().signOut()}>Sign out</button>
+        <Switch>
+          <Route path="/">
+            <ProfileHome />
+          </Route>
+        </Switch>
+      </div>
     );
   }
 }
