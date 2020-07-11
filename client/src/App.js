@@ -55,7 +55,7 @@ class SignIn extends React.Component {
               body: JSON.stringify({ email }),
             })
               .then((x) =>
-                x.status === 200 ? x.json() : Promise.reject("uh oh")
+                x.status === 200 ? x.json() : Promise.reject(x.json())
               )
               .catch(() => {
                 this.setState({
@@ -140,7 +140,49 @@ class ProfileHome extends React.Component {
                     return <p key={u.email}>{u.email}</p>;
                   })}
               </div>
-              <br />
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const email = this._friendEmailInput.value;
+                  this._friendEmailInput.value = "";
+                  firebase
+                    .auth()
+                    .currentUser.getIdToken()
+                    .then((token) => {
+                      fetch(serverPath("api/sync"), {
+                        method: "POST",
+                        headers: {
+                          token,
+                          "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                          type: "invite-user",
+                          data: { email, groupId: k },
+                        }),
+                      })
+                        .then((x) => {
+                          return x.status === 200
+                            ? x.json()
+                            : Promise.reject(x.json());
+                        })
+                        .catch((err) => {
+                          this.setState({
+                            errorMessage:
+                              "Uh oh, failed to create a group. plz ping stopa",
+                          });
+                        });
+                    });
+                }}
+              >
+                <input
+                  placeholder="your friend's email"
+                  ref={(x) => {
+                    this._friendEmailInput = x;
+                  }}
+                />
+                <button type="submit">invite</button>
+              </form>
+              <hr />
             </div>
           );
         })}
@@ -149,35 +191,17 @@ class ProfileHome extends React.Component {
             e.preventDefault();
             const name = this._groupNameInput.value;
             this._groupNameInput.value = "";
+            const groupKey = firebase.database().ref("/groups/").push().key;
+            const uid = firebase.auth().currentUser.uid;
+            const email = firebase.auth().currentUser.email;
             firebase
-              .auth()
-              .currentUser.getIdToken()
-              .then((token) => {
-                fetch(serverPath("api/sync"), {
-                  method: "POST",
-                  headers: {
-                    token,
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
-                    type: "create-group",
-                    data: { name },
-                  }),
-                })
-                  .then((x) => {
-                    debugger;
-                    return x.status === 200
-                      ? x.json()
-                      : Promise.reject(x.json());
-                  })
-                  .catch((err) => {
-                    debugger;
-                    this.setState({
-                      errorMessage:
-                        "Uh oh, failed to create a group. plz ping stopa",
-                    });
-                  });
-              });
+              .database()
+              .ref()
+              .update({
+                [`/groups/${groupKey}/name`]: name,
+                [`/groups/${groupKey}/users/${uid}`]: email,
+                [`/users/${uid}/groups/${groupKey}`]: true,
+              })
           }}
         >
           <input label="group name" ref={(x) => (this._groupNameInput = x)} />
