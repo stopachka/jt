@@ -12,11 +12,11 @@
             [io.aviso.logging.setup]
             [mailgun.mail :as mail]
             [markdown.core :as markdown-core]
-            [ring.adapter.jetty :as jetty]
             [ring.middleware.json :refer [wrap-json-body wrap-json-response]]
             [ring.middleware.keyword-params :refer [wrap-keyword-params]]
             [ring.middleware.params :refer [wrap-params]]
-            [ring.util.response :as resp :refer [response bad-request]])
+            [ring.util.response :as resp :refer [response bad-request]]
+            [org.httpkit.server :as server])
   (:import (java.time LocalTime ZonedDateTime ZoneId Period Instant)
            (java.time.format DateTimeFormatter)
            (com.google.firebase.database DatabaseException)
@@ -394,5 +394,5 @@
                 (wrap-json-body {:keywords? true})
                 wrap-json-response
                 wrap-cors)]
-    (jetty/run-jetty app {:port port :join? false}))
+    (server/run-server app {:port port}))
   (log/info "kicked off!"))
