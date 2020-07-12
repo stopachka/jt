@@ -283,6 +283,20 @@ class Journals extends React.Component {
   }
 }
 
+
+class Account extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      isLoading: true,
+      errorMessage: null,
+    };
+  }
+  render() {
+    return <h1>Account!</h1>;
+  }
+}
+
 class MeComp extends React.Component {
   constructor(props) {
     super(props);
@@ -316,12 +330,15 @@ class MeComp extends React.Component {
         {' '}
         <Link to="/me/journals">Journals</Link>
         {' '}
-        <button>Account</button>
+        <Link to="/me/account">Account</Link>
         {' '}
         <button onClick={() => firebase.auth().signOut()}>Sign out</button>
         <Switch>
           <Route path="/me/journals">
             <Journals />
+          </Route>
+          <Route path="/me/account">
+            <Account />
           </Route>
           <Route path="/me">
             <ProfileHome />
