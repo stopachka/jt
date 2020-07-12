@@ -94,21 +94,49 @@
       (.createCustomToken uid)))
 
 (defn user-from-id-token! [token]
- (-> (FirebaseAuth/getInstance)
-     (.verifyIdToken token)
-     user-record->map))
+  (-> (FirebaseAuth/getInstance)
+      (.verifyIdToken token)
+      user-record->map))
+;; ------------------------------------------------------------------------------
+;; groups
 
+(def group-root "/groups/")
+(defn get-group-by-id [id]
+  (firebase-fetch (str group-root id)))
+
+(defn add-member-to-group [group-id {:keys [uid email]}]
+  (let [add-user-to-group-fut (firebase-save
+                                (firebase-ref (str "/groups/" group-id "/users/" uid))
+                                {:email email})
+        add-group-to-user-fut (firebase-save
+                                (firebase-ref (str "/users/" uid "/groups/" group-id))
+                                true)]
+    (future
+      @add-user-to-group-fut
+      @add-group-to-user-fut)))
+
+;; ------------------------------------------------------------------------------
+;; invitations
+
+(def invitation-root "/invitations/")
+
+(defn get-invitation-by-id [id]
+  (firebase-fetch (str invitation-root id)))
+
+(defn delete-invitation [id]
+  (firebase-save (firebase-ref (str invitation-root id)) nil))
 ;; ------------------------------------------------------------------------------
 ;; magic codes
 
 (def magic-code-root "/magic-codes/")
 (defn- magic-code-path [code] (str magic-code-root code))
 
-(defn create-magic-code! [email]
+(defn create-magic-code! [{:keys [email invitations]}]
   (let [key (-> (firebase-ref magic-code-root)
                 .push
                 (firebase-save {:at (str (System/currentTimeMillis))
-                                :email email})
+                                :email email
+                                :invitations invitations})
                 deref
                 .getKey)]
     {:key key}))
@@ -124,46 +152,6 @@
     (when-let [res @(get-magic-code code)]
       (fut-bg @(kill-magic-code code))
       res)))
-
-;; ------------------------------------------------------------------------------
-;; groups
-
-(defn create-group [group-name {:keys [uid email] :as _user}]
-  (let [group-ref (-> (firebase-ref "/groups")
-                      .push)
-        group-id (.getKey group-ref)
-        save-group-fut (firebase-save
-                         group-ref
-                         {:name group-name
-                          :users {uid {:email email}}})
-        update-user-fut (firebase-save
-                          (firebase-ref (str "/users/" uid "/groups/" group-id))
-                          true)]
-    (future
-      @save-group-fut
-      @update-user-fut)))
-
-(defn remove-member-from-group [group-id uid]
-  (let [remove-from-group-fut (firebase-save
-                                (firebase-ref (str "/groups/" group-id "/users/" uid))
-                                nil)
-        remove-from-user-fut (firebase-save
-                               (firebase-ref (str "/users/" uid "/groups/" group-id))
-                               nil)]
-    (future
-      @remove-from-group-fut
-      @remove-from-user-fut)))
-
-(defn add-member-to-group [group-id {:keys [uid email]}]
-  (let [add-user-to-group-fut (firebase-save
-                                (firebase-ref (str "/groups/" group-id "/users/" uid))
-                                {:email email})
-        add-group-to-user-fut (firebase-save
-                                (firebase-ref (str "/users/" uid "/groups/" group-id))
-                                nil)]
-    (future
-      @add-user-to-group-fut
-      @add-group-to-user-fut)))
 
 ;; ------------------------------------------------------------------------------
 ;; init

@@ -220,6 +220,16 @@
      (url-with-magic-code magic-code)
      " to get started")})
 
+(defn content-group-invitation [sender-email receiver-email magic-code]
+  {:from signup-email-with-name
+   :to receiver-email
+   :subject "You've been invited to join a group on JournalTogether"
+   :html
+   (str
+     "<p>Hello there!</p>"
+     "<p>" sender-email "has invited you to join their group on Journal Together</p>"
+     "<p> Visit " (url-with-magic-code magic-code) " to join them")})
+
 ;; ------------------------------------------------------------------------------
 ;; Outgoing Mail
 
@@ -324,12 +334,38 @@
       (bad-request {:reason "invalid email"})
 
       :else
-      (do (send-email (content-magic-code-response email (:key (db/create-magic-code! email))))
+      (do (->> {:email email}
+               db/create-magic-code!
+               :key
+               (content-magic-code-response email)
+               send-email)
           (response {:receive true})))))
+
+(defn accept-invitation [id]
+  (future
+    (when-let [{:keys [sender-email group-id receiver-email] :as invitation}
+               @(db/get-invitation-by-id id)]
+      (if-not (and sender-email group-id receiver-email)
+        (log/warnf "skipping, invalid invitation %s" invitation)
+        (let [sender-user (db/get-user-by-email! sender-email)
+              receiver-user (db/get-user-by-email! receiver-email)
+              group @(db/get-group-by-id group-id)]
+          (if-not (and sender-user
+                       receiver-user
+                       group
+                       (-> group :users (get (:uid sender-user))))
+            (log/warnf "skipping invitation %s sender-user %s receiver-user %s group %s"
+                       invitation sender-user receiver-user group)
+            (do
+              (fut-bg @(db/delete-invitation id))
+              @(db/add-member-to-group group-id receiver-user))))))))
+
+(defn accept-invitations [invitations]
+  (pmap (fn [id] @(accept-invitation id)) invitations))
 
 (defn magic-auth-handler [{:keys [body] :as _req}]
   (let [{:keys [code]} body
-        {:keys [email]} @(db/consume-magic-code code)]
+        {:keys [email invitations]} @(db/consume-magic-code code)]
     (cond
       (nil? email)
       (bad-request {:reason "could not consume magic code"})
@@ -337,6 +373,8 @@
       :else
       (let [{:keys [uid]} (or (db/get-user-by-email! email)
                               (db/create-user! email))]
+        (when (seq invitations)
+          (fut-bg (accept-invitations invitations)))
         (response {:token (db/create-token-for-uid! uid)})))))
 
 ;; ------------------------------------------------------------------------------
@@ -345,13 +383,21 @@
 (defn sync-handler [{:keys [body headers] :as _req}]
   (let [{:keys [type data]} body
         token (get headers "token")
-        user (db/user-from-id-token! token)
-        res (condp = (keyword type)
-              :create-group
-              (let [{:keys [name]} data]
-                @(db/create-group name user)
-                :done))]
-    (response {:res res})))
+        user (db/user-from-id-token! token)]
+    (condp = (keyword type)
+      :invite-user
+      (let [{:keys [invitation-id]} data]
+        (when-let [{:keys [sender-email
+                           receiver-email]} @(db/get-invitation-by-id invitation-id)]
+          (if-not (email? receiver-email)
+            (bad-request "invalid email")
+            (do (->>
+                  {:email receiver-email :invitations [invitation-id]}
+                  db/create-magic-code!
+                  :key
+                  (content-group-invitation sender-email receiver-email)
+                  send-email)
+                (response {:sent true}))))))))
 
 ;; ------------------------------------------------------------------------------
 ;; Server

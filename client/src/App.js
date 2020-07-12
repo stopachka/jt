@@ -126,7 +126,10 @@ class ProfileHome extends React.Component {
   }
 
   render() {
-    const { idToGroup } = this.state;
+    const { idToGroup, errorMessage } = this.state;
+    if (errorMessage) {
+      return errorMessage;
+    }
     return (
       <div>
         <h2>Groups</h2>
@@ -165,24 +168,21 @@ class ProfileHome extends React.Component {
                     return (
                       <p key={u.email}>
                         {u.email}{" "}
-                        <button
-                          onClick={() => {
-                            if (arr.length === 1) {
-                              alert('yo you only have 1 thing, just delete the group. or better yet will do this for you...later');
-                              return;
-                            }
-                            const uid = firebase.auth().currentUser.uid;
-                            firebase
-                              .database()
-                              .ref()
-                              .update({
-                                [`/groups/${k}/users/${uk}`]: null,
-                                [`/users/${uk}/groups/${k}`]: null,
-                              });
-                          }}
-                        >
-                          delete user!
-                        </button>
+                        {arr.length > 1 && (
+                          <button
+                            onClick={() => {
+                              firebase
+                                .database()
+                                .ref()
+                                .update({
+                                  [`/groups/${k}/users/${uk}`]: null,
+                                  [`/users/${uk}/groups/${k}`]: null,
+                                });
+                            }}
+                          >
+                            delete user!
+                          </button>
+                        )}
                       </p>
                     );
                   })}
@@ -192,9 +192,20 @@ class ProfileHome extends React.Component {
                   e.preventDefault();
                   const email = this._friendEmailInput.value;
                   this._friendEmailInput.value = "";
-                  firebase
-                    .auth()
-                    .currentUser.getIdToken()
+                  const invitationRef = firebase
+                    .database()
+                    .ref("/invitations")
+                    .push();
+                  alert("ok, sent! this will be a cool flash message later");
+                  invitationRef
+                    .set({
+                      "sender-email": firebase.auth().currentUser.email,
+                      "receiver-email": email,
+                      "group-id": k,
+                    })
+                    .then((res) => {
+                      return firebase.auth().currentUser.getIdToken();
+                    })
                     .then((token) => {
                       fetch(serverPath("api/sync"), {
                         method: "POST",
@@ -204,21 +215,22 @@ class ProfileHome extends React.Component {
                         },
                         body: JSON.stringify({
                           type: "invite-user",
-                          data: { email, groupId: k },
+                          data: { "invitation-id": invitationRef.key },
                         }),
-                      })
-                        .then((x) => {
-                          return x.status === 200
-                            ? x.json()
-                            : Promise.reject(x.json());
-                        })
-                        .catch((err) => {
-                          this.setState({
-                            errorMessage:
-                              "Uh oh, failed to create a group. plz ping stopa",
-                          });
+                      }).then((x) => {
+                        return x.status === 200
+                          ? x.json()
+                          : Promise.reject(x.json());
+                      });
+                    })
+                    .then(
+                      () => {},
+                      () => {
+                        this.setState({
+                          errorMessage: "oi...failed invite user",
                         });
-                    });
+                      }
+                    );
                 }}
               >
                 <input
