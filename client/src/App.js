@@ -313,8 +313,11 @@ class MeComp extends React.Component {
     return (
       <div>
         <Link to="/me">Home</Link>
+        {' '}
         <Link to="/me/journals">Journals</Link>
+        {' '}
         <button>Account</button>
+        {' '}
         <button onClick={() => firebase.auth().signOut()}>Sign out</button>
         <Switch>
           <Route path="/me/journals">
