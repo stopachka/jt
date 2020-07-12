@@ -133,11 +133,58 @@ class ProfileHome extends React.Component {
         {Object.entries(idToGroup).map(([k, g]) => {
           return (
             <div key={k}>
-              <h4>{g.name}</h4>
+              <h4>
+                {g.name}{" "}
+                {
+                  <button
+                    onClick={() => {
+                      const uid = firebase.auth().currentUser.uid;
+                      const userKeysToDelete =
+                        (g.users &&
+                          Object.keys(g.users).reduce((res, uk) => {
+                            res[`/users/${uk}/groups/${k}`] = null;
+                            return res;
+                          }, {})) ||
+                        {};
+                      firebase
+                        .database()
+                        .ref()
+                        .update({
+                          [`/groups/${k}`]: null,
+                          ...userKeysToDelete,
+                        });
+                    }}
+                  >
+                    delete group!
+                  </button>
+                }
+              </h4>
               <div>
                 {g.users &&
-                  Object.values(g.users).map((u) => {
-                    return <p key={u.email}>{u.email}</p>;
+                  Object.entries(g.users).map(([uk, u], i, arr) => {
+                    return (
+                      <p key={u.email}>
+                        {u.email}{" "}
+                        <button
+                          onClick={() => {
+                            if (arr.length === 1) {
+                              alert('yo you only have 1 thing, just delete the group. or better yet will do this for you...later');
+                              return;
+                            }
+                            const uid = firebase.auth().currentUser.uid;
+                            firebase
+                              .database()
+                              .ref()
+                              .update({
+                                [`/groups/${k}/users/${uk}`]: null,
+                                [`/users/${uk}/groups/${k}`]: null,
+                              });
+                          }}
+                        >
+                          delete user!
+                        </button>
+                      </p>
+                    );
                   })}
               </div>
               <form
@@ -199,9 +246,9 @@ class ProfileHome extends React.Component {
               .ref()
               .update({
                 [`/groups/${groupKey}/name`]: name,
-                [`/groups/${groupKey}/users/${uid}`]: email,
+                [`/groups/${groupKey}/users/${uid}/email`]: email,
                 [`/users/${uid}/groups/${groupKey}`]: true,
-              })
+              });
           }}
         >
           <input label="group name" ref={(x) => (this._groupNameInput = x)} />
