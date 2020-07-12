@@ -20,7 +20,6 @@
   (:import (java.time LocalTime ZonedDateTime ZoneId Period Instant)
            (java.time.format DateTimeFormatter)
            (com.google.firebase.database DatabaseException)
-           (com.google.firebase.auth FirebaseAuthException FirebaseAuth)
            (com.stripe.model.checkout Session)
            (com.stripe Stripe)))
 
@@ -77,6 +76,7 @@
   {:port 8080
    :static-root "public"
    :mailgun {:domain "mg.journaltogether.com"}
+   :stripe {:premium-price-id "price_1H4E1BGnGs7xopb5CNZ33pxL"}
    :firebase
    {:auth {:uid "jt-sv"}
     :project-id "journaltogether"
@@ -380,36 +380,33 @@
         (response {:token (db/create-token-for-uid! uid)})))))
 
 ;; ------------------------------------------------------------------------------
-;; sync
+;; invitations
 
-(defn sync-handler [{:keys [body headers] :as _req}]
-  (let [{:keys [type data]} body
-        token (get headers "token")
-        user (db/user-from-id-token! token)]
-    (condp = (keyword type)
-      :invite-user
-      (let [{:keys [invitation-id]} data]
-        (when-let [{:keys [sender-email
-                           receiver-email]} @(db/get-invitation-by-id invitation-id)]
-          (if-not (email? receiver-email)
-            (bad-request "invalid email")
-            (do (->>
-                  {:email receiver-email :invitations [invitation-id]}
-                  db/create-magic-code!
-                  :key
-                  (content-group-invitation sender-email receiver-email)
-                  send-email)
-                (response {:sent true}))))))))
+(defn invite-user-handler [{:keys [body] :as _req}]
+  (let [{:keys [invitation-id]} body]
+    (let [{:keys [sender-email receiver-email] :as invitation}
+          @(db/get-invitation-by-id invitation-id)
+          _ (assert invitation (str "Invalid invitation " invitation-id))
+          _ (assert (email? receiver-email) (str "Invalid email " receiver-email))]
+      (->> {:email receiver-email :invitations [invitation-id]}
+           db/create-magic-code!
+           :key
+           (content-group-invitation sender-email receiver-email)
+           send-email)
+      (response {:sent true}))))
 
-(defn handle-create-checkout []
-  (Session/create {"success_url"
-                   "https://journaltogether.com/checkout/success?session_id={CHECKOUT_SESSION_ID}"
-                   "cancel_url"
-                   "https://journaltogether.com/checkout/cancel"
-                   "mode" "subscription"
-                   "line_items" [{"price" "{{PRICE_ID}}"
-                                  "quantity" 1}]
-                   "payment_method_types" ["card"]}))
+(defn create-session-handler [_req]
+  (let [session
+        (Session/create {"success_url"
+                         "https://journaltogether.com/checkout/success?session_id={CHECKOUT_SESSION_ID}"
+                         "cancel_url"
+                         "https://journaltogether.com/checkout/cancel"
+                         "mode" "subscription"
+                         "line_items" [{"price" (-> config :stripe :premium-price-id)
+                                        "quantity" 1}]
+                         "payment_method_types" ["card"]})]
+    (response {:id (.getId session)})))
+
 ;; ------------------------------------------------------------------------------
 ;; Server
 
@@ -431,14 +428,16 @@
   (POST "/api/magic/request" [] magic-request-handler)
   (POST "/api/magic/auth" [] magic-auth-handler)
 
-  (POST "/api/sync" [] sync-handler)
+  (POST "/api/me/invite-user" [] invite-user-handler)
+  (POST "/api/me/checkout/create-session" [] create-session-handler)
+
   ;; static assets
   (resources "/" {:root static-root})
   (GET "*" [] (render-static-file "index.html")))
 
 (defn -main []
   (db/init config secrets)
-  (set! Stripe apiKey )
+  (set! (. Stripe -apiKey) (-> secrets :stripe :secret-key))
   (fut-bg (chime-core/chime-at
             (reminder-period)
             handle-reminder))

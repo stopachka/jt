@@ -1,8 +1,9 @@
 import React from "react";
 import "./App.css";
-import { withRouter} from "react-router";
+import { withRouter } from "react-router";
 import { BrowserRouter as Router, Switch, Route, Link } from "react-router-dom";
 import * as firebase from "firebase/app";
+import { loadStripe } from "@stripe/stripe-js";
 
 // Set up Firebase
 import "firebase/auth";
@@ -17,6 +18,8 @@ firebase.initializeApp({
   appId: "1:625725315087:web:a946ce7cf0725381df2b7a",
   measurementId: "G-GYBL76DZQW",
 });
+
+const stripePromise = loadStripe("pk_live_erHEE5TRgYAlgqMkadDK7zmA");
 
 function serverPath(path) {
   const root =
@@ -202,19 +205,14 @@ class ProfileHome extends React.Component {
                       "receiver-email": email,
                       "group-id": k,
                     })
-                    .then((res) => {
-                      return firebase.auth().currentUser.getIdToken();
-                    })
-                    .then((token) => {
-                      fetch(serverPath("api/sync"), {
+                    .then(() => {
+                      fetch(serverPath("api/me/invite-user"), {
                         method: "POST",
                         headers: {
-                          token,
                           "Content-Type": "application/json",
                         },
                         body: JSON.stringify({
-                          type: "invite-user",
-                          data: { "invitation-id": invitationRef.key },
+                          "invitation-id": invitationRef.key,
                         }),
                       }).then((x) => {
                         return x.status === 200
@@ -283,17 +281,57 @@ class Journals extends React.Component {
   }
 }
 
-
 class Account extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
       isLoading: true,
-      errorMessage: null,
+      level: null,
     };
   }
+  componentDidMount() {
+    firebase
+      .database()
+      .ref(`/users/${firebase.auth().currentUser.uid}/level`)
+      .on("value", (snap) =>
+        this.setState({ isLoading: false, level: snap.val() })
+      );
+  }
   render() {
-    return <h1>Account!</h1>;
+    const { isLoading, level } = this.state;
+    if (isLoading) {
+      return <div>Loading...</div>;
+    }
+    if (level === "premium") {
+      return <div>You are a premium member! TODO let me downgrade</div>;
+    }
+    return (
+      <h1>
+        Hey, want to upgrade?{" "}
+        <button
+          onClick={() => {
+            const sessionPromise = fetch(
+              serverPath("api/me/checkout/create-session"),
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+              }
+            ).then((x) => {
+              return x.status === 200 ? x.json() : Promise.reject(x.json());
+            });
+            Promise.all([stripePromise, sessionPromise]).then(
+              ([stripe, session]) => {
+                stripe.redirectToCheckout({ sessionId: session["id"] });
+              }
+            );
+          }}
+        >
+          Click here to upgrade to premium
+        </button>
+      </h1>
+    );
   }
 }
 
@@ -326,12 +364,8 @@ class MeComp extends React.Component {
     }
     return (
       <div>
-        <Link to="/me">Home</Link>
-        {' '}
-        <Link to="/me/journals">Journals</Link>
-        {' '}
-        <Link to="/me/account">Account</Link>
-        {' '}
+        <Link to="/me">Home</Link> <Link to="/me/journals">Journals</Link>{" "}
+        <Link to="/me/account">Account</Link>{" "}
         <button onClick={() => firebase.auth().signOut()}>Sign out</button>
         <Switch>
           <Route path="/me/journals">
