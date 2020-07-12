@@ -141,7 +141,6 @@ class ProfileHome extends React.Component {
                 {
                   <button
                     onClick={() => {
-                      const uid = firebase.auth().currentUser.uid;
                       const userKeysToDelete =
                         (g.users &&
                           Object.keys(g.users).reduce((res, uk) => {
