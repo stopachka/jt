@@ -1,7 +1,7 @@
 import React from "react";
 import "./App.css";
-import { withRouter } from "react-router";
-import { BrowserRouter as Router, Switch, Route } from "react-router-dom";
+import { withRouter} from "react-router";
+import { BrowserRouter as Router, Switch, Route, Link } from "react-router-dom";
 import * as firebase from "firebase/app";
 
 // Set up Firebase
@@ -270,6 +270,19 @@ class ProfileHome extends React.Component {
   }
 }
 
+class Journals extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      isLoading: true,
+      errorMessage: null,
+    };
+  }
+  render() {
+    return <h1>Journals!</h1>;
+  }
+}
+
 class MeComp extends React.Component {
   constructor(props) {
     super(props);
@@ -299,11 +312,15 @@ class MeComp extends React.Component {
     }
     return (
       <div>
-        <button>Journals</button>
+        <Link to="/me">Home</Link>
+        <Link to="/me/journals">Journals</Link>
         <button>Account</button>
         <button onClick={() => firebase.auth().signOut()}>Sign out</button>
         <Switch>
-          <Route path="/">
+          <Route path="/me/journals">
+            <Journals />
+          </Route>
+          <Route path="/me">
             <ProfileHome />
           </Route>
         </Switch>
