@@ -20,7 +20,9 @@
   (:import (java.time LocalTime ZonedDateTime ZoneId Period Instant)
            (java.time.format DateTimeFormatter)
            (com.google.firebase.database DatabaseException)
-           (com.google.firebase.auth FirebaseAuthException FirebaseAuth)))
+           (com.google.firebase.auth FirebaseAuthException FirebaseAuth)
+           (com.stripe.model.checkout Session)
+           (com.stripe Stripe)))
 
 ;; ------------------------------------------------------------------------------
 ;; Helpers
@@ -399,6 +401,15 @@
                   send-email)
                 (response {:sent true}))))))))
 
+(defn handle-create-checkout []
+  (Session/create {"success_url"
+                   "https://journaltogether.com/checkout/success?session_id={CHECKOUT_SESSION_ID}"
+                   "cancel_url"
+                   "https://journaltogether.com/checkout/cancel"
+                   "mode" "subscription"
+                   "line_items" [{"price" "{{PRICE_ID}}"
+                                  "quantity" 1}]
+                   "payment_method_types" ["card"]}))
 ;; ------------------------------------------------------------------------------
 ;; Server
 
@@ -427,6 +438,7 @@
 
 (defn -main []
   (db/init config secrets)
+  (set! Stripe apiKey )
   (fut-bg (chime-core/chime-at
             (reminder-period)
             handle-reminder))
