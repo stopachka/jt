@@ -235,13 +235,13 @@
 ;; ------------------------------------------------------------------------------
 ;; Outgoing Mail
 
-(defn try-grab-task!
+(defn try-grab-task
   "given a task id, tries to reserve the task. Our database rules
   do not allow writes to existing tasks. This ensures only one can
   succeed, so only one worker can grab a task"
   [task-id]
   (try
-    @(db/firebase-save (db/firebase-ref (task-path task-id)) true)
+    (db/firebase-save (db/firebase-ref (task-path task-id)) true)
     (log/infof "[task] grabbed %s" task-id)
     :grabbed
     (catch DatabaseException _e
@@ -251,16 +251,16 @@
 (defn handle-reminder [_]
   (let [day (pst-now)
         task-id (str "reminder-" (->numeric-date-str day))]
-    (when (try-grab-task! task-id)
+    (when (try-grab-task task-id)
       (send-email (content-hows-your-day? (pst-now))))))
 
 (defn handle-summary [_]
   (let [day (.minusDays (pst-now) 1)
         task-id (str "summary-" (->numeric-date-str day))]
-    (when (try-grab-task! task-id)
+    (when (try-grab-task task-id)
       (let [entries (->> friends
                          (pmap (fn [email]
-                                 @(db/firebase-fetch
+                                 (db/firebase-fetch
                                     (journal-path email day))))
                          (filter seq))]
         (if-not (seq entries)
@@ -292,11 +292,11 @@
       (assoc :at (->epoch-milli (:date data)))
       (select-keys email-keys)))
 
-(defn handle-hows-your-day-response! [data]
+(defn handle-hows-your-day-response [data]
   (let [{:keys [sender subject date]} data
         email (data->journal data)]
     (cond
-      (seq @(db/firebase-fetch (journal-path sender date)))
+      (seq (db/firebase-fetch (journal-path sender date)))
       (send-email (content-already-received sender subject))
 
       :else
@@ -309,12 +309,12 @@
 
 (defn emails-handler [{:keys [params] :as req}]
   (fut-bg
-    (let [{:keys [recipient sender subject] :as data}
+    (let [{:keys [recipient sender] :as data}
           (-> params
               (assoc :date (parse-email-date params)))]
       (condp = recipient
         hows-your-day-email
-        (handle-hows-your-day-response! data)
+        (handle-hows-your-day-response data)
 
         :else
         (log/infof "skipping for recipient=%s sender=%s" recipient sender))))
