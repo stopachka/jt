@@ -261,7 +261,7 @@
       (let [entries (->> friends
                          (pmap (fn [email]
                                  (db/firebase-fetch
-                                    (journal-path email day))))
+                                   (db/firebase-ref (journal-path email day)))))
                          (filter seq))]
         (if-not (seq entries)
           (log/infof "skipping for %s because there are no entries" day)
@@ -296,7 +296,8 @@
   (let [{:keys [sender subject date]} data
         email (data->journal data)]
     (cond
-      (seq (db/firebase-fetch (journal-path sender date)))
+      (seq (db/firebase-fetch (db/firebase-ref
+                                (journal-path sender date))))
       (send-email (content-already-received sender subject))
 
       :else

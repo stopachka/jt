@@ -40,26 +40,25 @@
 
 (defn firebase-save [^DatabaseReference ref v]
   @(throwable-promise
-    (fn [resolve reject]
-      (-> ref
-          (.setValue
-            (stringify-keys v)
-            (reify DatabaseReference$CompletionListener
-              (onComplete [_this err ref]
-                (if err (reject (.toException err))
-                        (resolve ref)))))))))
+     (fn [resolve reject]
+       (-> ref
+           (.setValue
+             (stringify-keys v)
+             (reify DatabaseReference$CompletionListener
+               (onComplete [_this err ref]
+                 (if err (reject (.toException err))
+                         (resolve ref)))))))))
 
-(defn firebase-fetch [path]
+(defn firebase-fetch [^DatabaseReference ref]
   @(throwable-promise
      (fn [resolve reject]
-      (-> (FirebaseDatabase/getInstance)
-          (.getReference path)
-          (.addListenerForSingleValueEvent
-            (reify ValueEventListener
-              (onDataChange [_this s]
-                (resolve (->> s .getValue ->clj)))
-              (onCancelled [_this err]
-                (reject (.toException err)))))))))
+       (-> ref
+           (.addListenerForSingleValueEvent
+             (reify ValueEventListener
+               (onDataChange [_this s]
+                 (resolve (->> s .getValue ->clj)))
+               (onCancelled [_this err]
+                 (reject (.toException err)))))))))
 
 ;; ------------------------------------------------------------------------------
 ;; users
@@ -103,7 +102,7 @@
 
 (def group-root "/groups/")
 (defn get-group-by-id [id]
-  (firebase-fetch (str group-root id)))
+  (firebase-fetch (firebase-ref (str group-root id))))
 
 (defn add-user-to-group [group-id {:keys [uid email]}]
   (let [add-user-to-group-fut (firebase-save
@@ -125,7 +124,7 @@
 (def invitation-root "/invitations/")
 
 (defn get-invitation-by-id [id]
-  (firebase-fetch (str invitation-root id)))
+  (firebase-fetch (firebase-ref (str invitation-root id))))
 
 (defn delete-invitation [id]
   (firebase-save (firebase-ref (str invitation-root id)) nil))
@@ -146,7 +145,7 @@
     {:key key}))
 
 (defn- get-magic-code [code]
-  (firebase-fetch (magic-code-path code)))
+  (firebase-fetch (firebase-ref (magic-code-path code))))
 
 (defn- kill-magic-code [code]
   (firebase-save (firebase-ref (magic-code-path code)) nil))
