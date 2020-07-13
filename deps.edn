@@ -6,6 +6,7 @@
         io.aviso/logging {:mvn/version "0.3.2"}
         jarohen/chime {:mvn/version "0.3.2"}
         nilenso/mailgun {:mvn/version "0.2.3"}
+        ring-cors {:mvn/version "0.1.13"}
         ring/ring {:mvn/version "1.8.0"}
         ring/ring-json {:mvn/version "0.5.0"}
         markdown-clj {:mvn/version "1.10.4"}

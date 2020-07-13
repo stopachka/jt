@@ -8,7 +8,8 @@
              ValueEventListener
              DatabaseReference$CompletionListener DatabaseReference)
            (com.google.firebase.auth
-             FirebaseAuth UserRecord$CreateRequest FirebaseAuthException)))
+             FirebaseAuth UserRecord$CreateRequest FirebaseAuthException)
+           (com.stripe.model Customer)))
 
 (defprotocol ConvertibleToClojure
   "Converts nested java objects to clojure objects.
@@ -61,6 +62,22 @@
                  (reject (.toException err)))))))))
 
 ;; ------------------------------------------------------------------------------
+;; payment-info
+
+(defn payment-info-path [uid]
+  (str "/users/" uid "/payment-info/"))
+
+(defn save-payment-info [uid payment-info]
+  (firebase-save (firebase-ref (payment-info-path uid)) payment-info))
+
+(defn get-payment-info [uid]
+  (firebase-fetch (firebase-ref (payment-info-path uid))))
+
+(defn create-payment-info [{:keys [uid email] :as _user}]
+  (let [cus (Customer/create {"email" email})]
+    (save-payment-info uid {:customer-id (.getId cus)})))
+
+;; ------------------------------------------------------------------------------
 ;; users
 
 (defn- user-record->map [x]
@@ -68,11 +85,13 @@
    :email (.getEmail x)})
 
 (defn create-user [email]
-  (-> (FirebaseAuth/getInstance)
-      (.createUser (-> (UserRecord$CreateRequest.)
-                       (.setEmail email)
-                       (.setEmailVerified true)))
-      user-record->map))
+  (let [user (-> (FirebaseAuth/getInstance)
+                          (.createUser (-> (UserRecord$CreateRequest.)
+                                           (.setEmail email)
+                                           (.setEmailVerified true)))
+                          user-record->map)]
+    (create-payment-info user)
+    user))
 
 (defn get-user-by-email [email]
   (try

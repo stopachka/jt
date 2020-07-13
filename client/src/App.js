@@ -314,17 +314,21 @@ class Account extends React.Component {
         <button
           onClick={() => {
             this.setState({ isLoading: true });
-            const sessionPromise = fetch(
-              serverPath("api/me/checkout/create-session"),
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-              }
-            ).then((x) => {
-              return x.status === 200 ? x.json() : Promise.reject(x.json());
-            });
+            const sessionPromise = firebase
+              .auth()
+              .currentUser.getIdToken()
+              .then((token) => {
+                return fetch(serverPath("api/me/checkout/create-session"), {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "token": token,
+                  },
+                });
+              })
+              .then((x) => {
+                return x.status === 200 ? x.json() : Promise.reject(x.json());
+              });
             Promise.all([stripePromise, sessionPromise]).then(
               ([stripe, session]) => {
                 stripe.redirectToCheckout({ sessionId: session["id"] });
@@ -343,6 +347,10 @@ class Account extends React.Component {
       </h1>
     );
   }
+}
+
+function CheckoutSuccess() {
+  return <div>Baam you're signed up :)</div>
 }
 
 class MeComp extends React.Component {
@@ -383,6 +391,9 @@ class MeComp extends React.Component {
           </Route>
           <Route path="/me/account">
             <Account />
+          </Route>
+          <Route path="/me/checkout/success">
+            <CheckoutSuccess />
           </Route>
           <Route path="/me">
             <ProfileHome />

@@ -16,6 +16,7 @@
             [ring.middleware.json :refer [wrap-json-body wrap-json-response]]
             [ring.middleware.keyword-params :refer [wrap-keyword-params]]
             [ring.middleware.params :refer [wrap-params]]
+            [ring.middleware.cors :refer [wrap-cors]]
             [ring.util.request :refer [body-string]]
             [ring.util.response :as resp :refer [response bad-request]])
   (:import (java.time LocalTime ZonedDateTime ZoneId Period Instant)
@@ -24,7 +25,7 @@
            (com.stripe.model.checkout Session)
            (com.stripe Stripe)
            (com.stripe.net Webhook)
-           (com.stripe.model Event)))
+           (com.stripe.model Event Customer)))
 
 ;; ------------------------------------------------------------------------------
 ;; Helpers
@@ -398,18 +399,24 @@
 ;; ------------------------------------------------------------------------------
 ;; stripe
 
-(defn create-session-handler [_req]
-  (let [session
-        (Session/create {"success_url"
-                         "https://journaltogether.com/checkout/success?session_id={CHECKOUT_SESSION_ID}"
-                         "cancel_url"
-                         "https://journaltogether.com/checkout/cancel"
-                         "mode" "subscription"
-                         "line_items" [{"price" (-> config :stripe :premium-price-id)
-                                        "quantity" 1}]
-                         "payment_method_types" ["card"]})]
-    (response {:id (.getId session)})))
+(defn create-session-handler [{:keys [headers] :as _req}]
+  (let [{:keys [uid] :as _user} (db/user-from-id-token (get headers "token"))
+        {:keys [customer-id] :as _payment-info} (db/get-payment-info uid)
 
+        _ (assert customer-id (format "expected a valid customer-id for %s" uid))
+
+        session
+        (Session/create
+          {"success_url"
+           "http://localhost:3000/me/checkout/success?session_id={CHECKOUT_SESSION_ID}"
+           "cancel_url"
+           "https://localhost:3000/me/account"
+           "customer" customer-id
+           "mode" "subscription"
+           "line_items" [{"price" (-> config :stripe :premium-price-id)
+                          "quantity" 1}]
+           "payment_method_types" ["card"]})]
+    (response {:id (.getId session)})))
 
 (defn webhooks-stripe-handler [{:keys [headers] :as req}]
   (let [sig (get headers "stripe-signature")
@@ -426,13 +433,6 @@
 
 ;; ------------------------------------------------------------------------------
 ;; Server
-
-(defn wrap-cors [handler]
-  (fn [request]
-    (some-> (handler request)
-            (update-in [:headers] assoc
-                       "Access-Control-Allow-Origin" "*"
-                       "Access-Control-Allow-Headers" "*"))))
 
 (def static-root (:static-root config))
 (defn render-static-file [filename]
@@ -477,7 +477,8 @@
                   wrap-params
                   (wrap-json-body {:keywords? true})
                   wrap-json-response
-                  wrap-cors)
+                  (wrap-cors :access-control-allow-origin [#".*"]
+                             :access-control-allow-methods [:get :put :post :delete]))
               static-routes)]
     (jetty/run-jetty app {:port port}))
   (log/info "kicked off!"))
