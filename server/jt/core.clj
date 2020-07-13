@@ -12,17 +12,19 @@
             [io.aviso.logging.setup]
             [mailgun.mail :as mail]
             [markdown.core :as markdown-core]
+            [ring.adapter.jetty :as jetty]
             [ring.middleware.json :refer [wrap-json-body wrap-json-response]]
             [ring.middleware.keyword-params :refer [wrap-keyword-params]]
             [ring.middleware.params :refer [wrap-params]]
             [ring.util.request :refer [body-string]]
-            [ring.util.response :as resp :refer [response bad-request]]
-            [org.httpkit.server :as server])
+            [ring.util.response :as resp :refer [response bad-request]])
   (:import (java.time LocalTime ZonedDateTime ZoneId Period Instant)
            (java.time.format DateTimeFormatter)
            (com.google.firebase.database DatabaseException)
            (com.stripe.model.checkout Session)
-           (com.stripe Stripe)))
+           (com.stripe Stripe)
+           (com.stripe.net Webhook)
+           (com.stripe.model Event)))
 
 ;; ------------------------------------------------------------------------------
 ;; Helpers
@@ -409,23 +411,28 @@
     (response {:id (.getId session)})))
 
 
-(def _req (atom nil))
-(defn webhooks-stripe-handler [req]
-  (log/error "oi!")
-  (reset! _req req)
-  (response {:ok true}))
+(defn webhooks-stripe-handler [{:keys [headers] :as req}]
+  (let [sig (get headers "stripe-signature")
+        body-str (body-string req)
+        ^Event evt (Webhook/constructEvent
+                     body-str sig (-> secrets :stripe :webhook-secret))]
+    (condp = (.getType evt)
+      "checkout.session.completed"
+      (let [^Session session (-> evt .getDataObjectDeserializer .getObject)]
+        (log/infof "would be completing the purchase here!"))
+
+      (log/infof "ignoring evt %s " evt))
+    (response {:receive true})))
 
 ;; ------------------------------------------------------------------------------
 ;; Server
 
 (defn wrap-cors [handler]
   (fn [request]
-    (let [res (handler request)]
-      (if-not res
-        res
-        (-> res
-            (assoc-in [:headers "Access-Control-Allow-Origin"] "*")
-            (assoc-in [:headers "Access-Control-Allow-Headers"] "*"))))))
+    (some-> (handler request)
+            (update-in [:headers] assoc
+                       "Access-Control-Allow-Origin" "*"
+                       "Access-Control-Allow-Headers" "*"))))
 
 (def static-root (:static-root config))
 (defn render-static-file [filename]
@@ -433,19 +440,19 @@
     (resp/resource-response filename {:root static-root}) "text/html"))
 
 (defroutes
+  webhook-routes
+  (context "/hooks" []
+    (POST "/stripe" [] webhooks-stripe-handler)))
+
+(defroutes
   api-routes
   (context "/api" []
     (POST "/emails" [] emails-handler)
-
     (POST "/magic/request" [] magic-request-handler)
     (POST "/magic/auth" [] magic-auth-handler)
 
     (POST "/me/invite-user" [] invite-user-handler)
     (POST "/me/checkout/create-session" [] create-session-handler)))
-
-(defroutes
-  webhook-routes
-  (POST "/webhooks/stripe" [] webhooks-stripe-handler))
 
 (defroutes
   static-routes
@@ -463,12 +470,14 @@
             handle-summary))
   (let [{:keys [port]} config
         app (routes
+              (-> webhook-routes
+                  wrap-json-response)
               (-> api-routes
                   wrap-keyword-params
                   wrap-params
                   (wrap-json-body {:keywords? true})
-                  wrap-json-response)
-              webhook-routes
+                  wrap-json-response
+                  wrap-cors)
               static-routes)]
-    (server/run-server app {:port port}))
+    (jetty/run-jetty app {:port port}))
   (log/info "kicked off!"))
