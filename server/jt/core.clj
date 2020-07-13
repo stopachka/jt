@@ -420,9 +420,12 @@
 
 (defn wrap-cors [handler]
   (fn [request]
-    (-> (handler request)
-        (assoc-in [:headers "Access-Control-Allow-Origin"] "*")
-        (assoc-in [:headers "Access-Control-Allow-Headers"] "*"))))
+    (let [res (handler request)]
+      (if-not res
+        res
+        (-> res
+            (assoc-in [:headers "Access-Control-Allow-Origin"] "*")
+            (assoc-in [:headers "Access-Control-Allow-Headers"] "*"))))))
 
 (def static-root (:static-root config))
 (defn render-static-file [filename]
@@ -460,13 +463,12 @@
             handle-summary))
   (let [{:keys [port]} config
         app (routes
-              webhook-routes
               (-> api-routes
                   wrap-keyword-params
                   wrap-params
                   (wrap-json-body {:keywords? true})
-                  wrap-json-response
-                  wrap-cors)
+                  wrap-json-response)
+              webhook-routes
               static-routes)]
     (server/run-server app {:port port}))
   (log/info "kicked off!"))
