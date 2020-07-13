@@ -7,7 +7,7 @@
             [clojure.tools.logging :as log]
             [jt.db :as db]
             [jt.concurrency :refer [fut-bg]]
-            [compojure.core :refer [defroutes GET POST]]
+            [compojure.core :refer [context routes defroutes GET POST]]
             [compojure.route :refer [resources]]
             [io.aviso.logging.setup]
             [mailgun.mail :as mail]
@@ -15,6 +15,7 @@
             [ring.middleware.json :refer [wrap-json-body wrap-json-response]]
             [ring.middleware.keyword-params :refer [wrap-keyword-params]]
             [ring.middleware.params :refer [wrap-params]]
+            [ring.util.request :refer [body-string]]
             [ring.util.response :as resp :refer [response bad-request]]
             [org.httpkit.server :as server])
   (:import (java.time LocalTime ZonedDateTime ZoneId Period Instant)
@@ -76,7 +77,7 @@
   {:port 8080
    :static-root "public"
    :mailgun {:domain "mg.journaltogether.com"}
-   :stripe {:premium-price-id "price_1H4E1BGnGs7xopb5CNZ33pxL"}
+   :stripe {:premium-price-id "price_1H4IDVGnGs7xopb5ZhBQ2hnU"}
    :firebase
    {:auth {:uid "jt-sv"}
     :project-id "journaltogether"
@@ -392,6 +393,9 @@
            send-email)
       (response {:sent true}))))
 
+;; ------------------------------------------------------------------------------
+;; stripe
+
 (defn create-session-handler [_req]
   (let [session
         (Session/create {"success_url"
@@ -403,6 +407,13 @@
                                         "quantity" 1}]
                          "payment_method_types" ["card"]})]
     (response {:id (.getId session)})))
+
+
+(def _req (atom nil))
+(defn webhooks-stripe-handler [req]
+  (log/error "oi!")
+  (reset! _req req)
+  (response {:ok true}))
 
 ;; ------------------------------------------------------------------------------
 ;; Server
@@ -419,16 +430,22 @@
     (resp/resource-response filename {:root static-root}) "text/html"))
 
 (defroutes
-  routes
-  (POST "/api/emails" [] emails-handler)
+  api-routes
+  (context "/api" []
+    (POST "/emails" [] emails-handler)
 
-  (POST "/api/magic/request" [] magic-request-handler)
-  (POST "/api/magic/auth" [] magic-auth-handler)
+    (POST "/magic/request" [] magic-request-handler)
+    (POST "/magic/auth" [] magic-auth-handler)
 
-  (POST "/api/me/invite-user" [] invite-user-handler)
-  (POST "/api/me/checkout/create-session" [] create-session-handler)
+    (POST "/me/invite-user" [] invite-user-handler)
+    (POST "/me/checkout/create-session" [] create-session-handler)))
 
-  ;; static assets
+(defroutes
+  webhook-routes
+  (POST "/webhooks/stripe" [] webhooks-stripe-handler))
+
+(defroutes
+  static-routes
   (resources "/" {:root static-root})
   (GET "*" [] (render-static-file "index.html")))
 
@@ -442,11 +459,14 @@
             (summary-period)
             handle-summary))
   (let [{:keys [port]} config
-        app (-> routes
-                wrap-keyword-params
-                wrap-params
-                (wrap-json-body {:keywords? true})
-                wrap-json-response
-                wrap-cors)]
+        app (routes
+              webhook-routes
+              (-> api-routes
+                  wrap-keyword-params
+                  wrap-params
+                  (wrap-json-body {:keywords? true})
+                  wrap-json-response
+                  wrap-cors)
+              static-routes)]
     (server/run-server app {:port port}))
   (log/info "kicked off!"))

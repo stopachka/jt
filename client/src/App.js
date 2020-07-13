@@ -19,7 +19,7 @@ firebase.initializeApp({
   measurementId: "G-GYBL76DZQW",
 });
 
-const stripePromise = loadStripe("pk_live_erHEE5TRgYAlgqMkadDK7zmA");
+const stripePromise = loadStripe("pk_test_1iGrM3ZC85K4LbvyaphPMBr6");
 
 function serverPath(path) {
   const root =
@@ -298,7 +298,10 @@ class Account extends React.Component {
       );
   }
   render() {
-    const { isLoading, level } = this.state;
+    const { isLoading, errorMessage, level } = this.state;
+    if (errorMessage) {
+      return <div>{errorMessage}</div>;
+    }
     if (isLoading) {
       return <div>Loading...</div>;
     }
@@ -310,6 +313,7 @@ class Account extends React.Component {
         Hey, want to upgrade?{" "}
         <button
           onClick={() => {
+            this.setState({ isLoading: true });
             const sessionPromise = fetch(
               serverPath("api/me/checkout/create-session"),
               {
@@ -324,6 +328,12 @@ class Account extends React.Component {
             Promise.all([stripePromise, sessionPromise]).then(
               ([stripe, session]) => {
                 stripe.redirectToCheckout({ sessionId: session["id"] });
+              },
+              (e) => {
+                this.setState({
+                  isLoading: false,
+                  errorMessage: "Oh boy. can't upgrade ya.",
+                });
               }
             );
           }}
