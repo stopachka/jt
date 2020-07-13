@@ -365,17 +365,13 @@
     (db/delete-invitation id)
     (db/add-user-to-group group-id receiver-user)))
 
-(defn accept-invitations [invitations]
-  (pmap (fn [id] (accept-invitation id)) invitations))
-
 (defn magic-auth-handler [{:keys [body] :as _req}]
   (let [{:keys [code]} body
         {:keys [email invitations]} (db/consume-magic-code code)
         _ (assert (email? email) (str "Expected a valid email =" email))]
     (let [{:keys [uid]} (or (db/get-user-by-email email)
                             (db/create-user email))]
-      (when (seq invitations)
-        (accept-invitations invitations))
+      (pmap accept-invitation invitations)
       (response {:token (db/create-token-for-uid uid)}))))
 
 ;; ------------------------------------------------------------------------------

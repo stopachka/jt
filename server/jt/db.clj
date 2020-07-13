@@ -154,7 +154,7 @@
 
 (defn consume-magic-code [code]
   (when-let [res (get-magic-code code)]
-    (fut-bg (kill-magic-code code))
+    (kill-magic-code code)
     res))
 
 ;; ------------------------------------------------------------------------------
