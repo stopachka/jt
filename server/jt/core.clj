@@ -25,7 +25,7 @@
            (com.stripe.model.checkout Session)
            (com.stripe Stripe)
            (com.stripe.net Webhook)
-           (com.stripe.model Event Customer)))
+           (com.stripe.model Event)))
 
 ;; ------------------------------------------------------------------------------
 ;; Helpers
@@ -426,7 +426,7 @@
     (condp = (.getType evt)
       "checkout.session.completed"
       (let [^Session session (-> evt .getDataObjectDeserializer .getObject)]
-        (log/infof "would be completing the purchase here!"))
+        (log/infof "would be completing the purchase here! =%s" session))
 
       (log/infof "ignoring evt %s " evt))
     (response {:receive true})))
