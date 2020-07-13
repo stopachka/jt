@@ -7,7 +7,8 @@
              FirebaseDatabase
              ValueEventListener
              DatabaseReference$CompletionListener DatabaseReference)
-           (com.google.firebase.auth UserRecord FirebaseAuth UserRecord$CreateRequest FirebaseAuthException)))
+           (com.google.firebase.auth
+             FirebaseAuth UserRecord$CreateRequest FirebaseAuthException)))
 
 (defprotocol ConvertibleToClojure
   "Converts nested java objects to clojure objects.
@@ -67,14 +68,14 @@
   {:uid (.getUid x)
    :email (.getEmail x)})
 
-(defn create-user! [email]
+(defn create-user [email]
   (-> (FirebaseAuth/getInstance)
       (.createUser (-> (UserRecord$CreateRequest.)
                        (.setEmail email)
                        (.setEmailVerified true)))
       user-record->map))
 
-(defn get-user-by-email! [email]
+(defn get-user-by-email [email]
   (try
     (-> (FirebaseAuth/getInstance)
         (.getUserByEmail email)
@@ -84,16 +85,16 @@
         nil
         (throw e)))))
 
-(defn get-user-by-uid! [uid]
+(defn get-user-by-uid [uid]
   (-> (FirebaseAuth/getInstance)
       (.getUser uid)
       user-record->map))
 
-(defn create-token-for-uid! [uid]
+(defn create-token-for-uid [uid]
   (-> (FirebaseAuth/getInstance)
       (.createCustomToken uid)))
 
-(defn user-from-id-token! [token]
+(defn user-from-id-token [token]
   (-> (FirebaseAuth/getInstance)
       (.verifyIdToken token)
       user-record->map))
@@ -102,18 +103,21 @@
 
 (def group-root "/groups/")
 (defn get-group-by-id [id]
-  (firebase-fetch (str group-root id)))
+  @(firebase-fetch (str group-root id)))
 
-(defn add-member-to-group [group-id {:keys [uid email]}]
+(defn add-user-to-group [group-id {:keys [uid email]}]
   (let [add-user-to-group-fut (firebase-save
-                                (firebase-ref (str "/groups/" group-id "/users/" uid))
-                                {:email email})
+                                (firebase-ref (str "/groups/" group-id "/users/" uid "/email"))
+                                email)
         add-group-to-user-fut (firebase-save
                                 (firebase-ref (str "/users/" uid "/groups/" group-id))
                                 true)]
-    (future
-      @add-user-to-group-fut
-      @add-group-to-user-fut)))
+    @add-user-to-group-fut
+    @add-group-to-user-fut))
+
+(defn user-belongs-to-group? [group user]
+  (let [uid-kw (-> user :uid keyword)]
+    (-> group :users uid-kw boolean)))
 
 ;; ------------------------------------------------------------------------------
 ;; invitations
@@ -121,17 +125,18 @@
 (def invitation-root "/invitations/")
 
 (defn get-invitation-by-id [id]
-  (firebase-fetch (str invitation-root id)))
+  @(firebase-fetch (str invitation-root id)))
 
 (defn delete-invitation [id]
-  (firebase-save (firebase-ref (str invitation-root id)) nil))
+  @(firebase-save (firebase-ref (str invitation-root id)) nil))
+
 ;; ------------------------------------------------------------------------------
 ;; magic codes
 
 (def magic-code-root "/magic-codes/")
 (defn- magic-code-path [code] (str magic-code-root code))
 
-(defn create-magic-code! [{:keys [email invitations]}]
+(defn create-magic-code [{:keys [email invitations]}]
   (let [key (-> (firebase-ref magic-code-root)
                 .push
                 (firebase-save {:at (str (System/currentTimeMillis))
@@ -142,16 +147,15 @@
     {:key key}))
 
 (defn- get-magic-code [code]
-  (firebase-fetch (magic-code-path code)))
+  @(firebase-fetch (magic-code-path code)))
 
 (defn- kill-magic-code [code]
-  (firebase-save (firebase-ref (magic-code-path code)) nil))
+  @(firebase-save (firebase-ref (magic-code-path code)) nil))
 
 (defn consume-magic-code [code]
-  (future
-    (when-let [res @(get-magic-code code)]
-      (fut-bg @(kill-magic-code code))
-      res)))
+  (when-let [res (get-magic-code code)]
+    (fut-bg (kill-magic-code code))
+    res))
 
 ;; ------------------------------------------------------------------------------
 ;; init

@@ -229,7 +229,7 @@
    :html
    (str
      "<p>Hello there!</p>"
-     "<p>" sender-email "has invited you to join their group on Journal Together</p>"
+     "<p>" sender-email " has invited you to join their group on Journal Together</p>"
      "<p> Visit " (url-with-magic-code magic-code) " to join them")})
 
 ;; ------------------------------------------------------------------------------
@@ -337,7 +337,7 @@
 
       :else
       (do (->> {:email email}
-               db/create-magic-code!
+               db/create-magic-code
                :key
                (content-magic-code-response email)
                send-email)
@@ -345,36 +345,38 @@
 
 (defn accept-invitation [id]
   (let [{:keys [sender-email group-id receiver-email] :as invitation}
-        @(db/get-invitation-by-id id)
+        (db/get-invitation-by-id id)
 
         _ (assert invitation (format "Expected invitation for id = %s" id))
 
-        sender-user (db/get-user-by-email! sender-email)
-        receiver-user (db/get-user-by-email! receiver-email)
-        group @(db/get-group-by-id group-id)
+        sender-user (db/get-user-by-email sender-email)
+        receiver-user (db/get-user-by-email receiver-email)
+        group (db/get-group-by-id group-id)
 
         _ (assert
             (and sender-user receiver-user group)
-            (format "Expected data for invitation = %s sender-user = %s receiver-user = %s group = %s" invitation sender-user receiver-user group))
+            (format (str "Expected data for invitation = %s "
+                         "sender-user = %s receiver-user = %s group = %s")
+                    invitation sender-user receiver-user group))
         _ (assert
-            (-> group :users (get (:uid sender-user)))
-            (format "Expected sender-user = %s to belong to group = %s" sender-user group))]
-    (do
-      (fut-bg @(db/delete-invitation id))
-      @(db/add-member-to-group group-id receiver-user))))
+            (db/user-belongs-to-group? group sender-user)
+            (format "Expected sender-user = %s to belong to group = %s"
+                    sender-user group))]
+    (db/delete-invitation id)
+    (db/add-user-to-group group-id receiver-user)))
 
 (defn accept-invitations [invitations]
   (pmap (fn [id] (accept-invitation id)) invitations))
 
 (defn magic-auth-handler [{:keys [body] :as _req}]
   (let [{:keys [code]} body
-        {:keys [email invitations]} @(db/consume-magic-code code)
+        {:keys [email invitations]} (db/consume-magic-code code)
         _ (assert (email? email) (str "Expected a valid email =" email))]
-    (let [{:keys [uid]} (or (db/get-user-by-email! email)
-                            (db/create-user! email))]
+    (let [{:keys [uid]} (or (db/get-user-by-email email)
+                            (db/create-user email))]
       (when (seq invitations)
-        (fut-bg (accept-invitations invitations)))
-      (response {:token (db/create-token-for-uid! uid)}))))
+        (accept-invitations invitations))
+      (response {:token (db/create-token-for-uid uid)}))))
 
 ;; ------------------------------------------------------------------------------
 ;; invitations
@@ -382,11 +384,12 @@
 (defn invite-user-handler [{:keys [body] :as _req}]
   (let [{:keys [invitation-id]} body]
     (let [{:keys [sender-email receiver-email] :as invitation}
-          @(db/get-invitation-by-id invitation-id)
+          (db/get-invitation-by-id invitation-id)
+
           _ (assert invitation (format "Invalid invitation id = %s" invitation-id))
           _ (assert (email? receiver-email) (format "Invalid email = %s" receiver-email))]
       (->> {:email receiver-email :invitations [invitation-id]}
-           db/create-magic-code!
+           db/create-magic-code
            :key
            (content-group-invitation sender-email receiver-email)
            send-email)
