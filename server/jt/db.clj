@@ -6,7 +6,7 @@
            (com.google.firebase.database
              FirebaseDatabase
              ValueEventListener
-             DatabaseReference$CompletionListener DatabaseReference)
+             DatabaseReference$CompletionListener DatabaseReference Query)
            (com.google.firebase.auth
              FirebaseAuth UserRecord$CreateRequest FirebaseAuthException)
            (com.stripe.model Customer)))
@@ -50,7 +50,7 @@
                  (if err (reject (.toException err))
                          (resolve ref)))))))))
 
-(defn firebase-fetch [^DatabaseReference ref]
+(defn firebase-fetch [^Query ref]
   @(throwable-promise
      (fn [resolve reject]
        (-> ref
@@ -112,10 +112,30 @@
   (-> (FirebaseAuth/getInstance)
       (.createCustomToken uid)))
 
-(defn user-from-id-token [token]
+(defn get-user-from-id-token [token]
   (-> (FirebaseAuth/getInstance)
       (.verifyIdToken token)
       user-record->map))
+
+(defn get-user-by-customer-id [customer-id]
+  (let [id-kws (-> (firebase-ref "/users/")
+                   (.orderByChild "/payment-info/customer-id")
+                   (.equalTo customer-id)
+                   firebase-fetch
+                   keys)
+        _ (assert (= (count id-kws) 1)
+                  (format "expected 1 uid, got %s" id-kws))
+        user (-> id-kws
+                 first
+                 name
+                 get-user-by-uid)]
+    user))
+
+(defn save-user-level [uid level]
+  (firebase-save
+    (firebase-ref (str "/users/" uid "/level/"))
+    (name level)))
+
 ;; ------------------------------------------------------------------------------
 ;; groups
 

@@ -306,7 +306,46 @@ class Account extends React.Component {
       return <div>Loading...</div>;
     }
     if (level === "premium") {
-      return <div>You are a premium member! TODO let me downgrade</div>;
+      return (
+        <div>
+          You are a premium member!{" "}
+          <button
+            onClick={(e) => {
+              this.setState({ isLoading: true });
+              firebase
+                .auth()
+                .currentUser.getIdToken()
+                .then((token) => {
+                  return fetch(
+                    serverPath("api/me/checkout/cancel-subscription"),
+                    {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        token: token,
+                      },
+                    }
+                  );
+                })
+                .then((x) => {
+                  return x.status === 200 ? x.json() : Promise.reject(x.json());
+                })
+                .then(
+                  (x) => this.setState({ isLoading: false }),
+                  (e) => {
+                    debugger
+                    this.setState({
+                      isLoading: false,
+                      errorMessage: "Oh boy. can't downgrade ya.",
+                    });
+                  }
+                );
+            }}
+          >
+            downgrade
+          </button>
+        </div>
+      );
     }
     return (
       <h1>
@@ -322,7 +361,7 @@ class Account extends React.Component {
                   method: "POST",
                   headers: {
                     "Content-Type": "application/json",
-                    "token": token,
+                    token: token,
                   },
                 });
               })
@@ -350,7 +389,7 @@ class Account extends React.Component {
 }
 
 function CheckoutSuccess() {
-  return <div>Baam you're signed up :)</div>
+  return <div>Baam you're signed up :)</div>;
 }
 
 class MeComp extends React.Component {

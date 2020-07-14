@@ -25,7 +25,7 @@
            (com.stripe.model.checkout Session)
            (com.stripe Stripe)
            (com.stripe.net Webhook)
-           (com.stripe.model Event)))
+           (com.stripe.model Event Subscription)))
 
 ;; ------------------------------------------------------------------------------
 ;; Helpers
@@ -373,6 +373,7 @@
 (defn magic-auth-handler [{:keys [body] :as _req}]
   (let [{:keys [code]} body
         {:keys [email invitations]} (db/consume-magic-code code)
+
         _ (assert (email? email) (str "Expected a valid email =" email))]
     (let [{:keys [uid]} (or (db/get-user-by-email email)
                             (db/create-user email))]
@@ -399,8 +400,22 @@
 ;; ------------------------------------------------------------------------------
 ;; stripe
 
+(defn cancel-subscription-handler [{:keys [headers] :as _req}]
+  (let [{:keys [uid] :as user} (db/get-user-from-id-token (get headers "token"))
+        {:keys [customer-id subscription-id] :as _payment-info} (db/get-payment-info uid)
+        _ (assert (and customer-id subscription-id)
+                  (format "expected a valid subscription for user=%s" user))
+        sub (Subscription/retrieve subscription-id)]
+    (cond
+      (= (.getStatus sub) "canceled")
+      (bad-request {:code "already_canceled"})
+
+      :else
+      (.cancel sub))
+    (response {:receive true})))
+
 (defn create-session-handler [{:keys [headers] :as _req}]
-  (let [{:keys [uid] :as _user} (db/user-from-id-token (get headers "token"))
+  (let [{:keys [uid] :as _user} (db/get-user-from-id-token (get headers "token"))
         {:keys [customer-id] :as _payment-info} (db/get-payment-info uid)
 
         _ (assert customer-id (format "expected a valid customer-id for %s" uid))
@@ -410,7 +425,7 @@
           {"success_url"
            "http://localhost:3000/me/checkout/success?session_id={CHECKOUT_SESSION_ID}"
            "cancel_url"
-           "https://localhost:3000/me/account"
+           "http://localhost:3000/me/account"
            "customer" customer-id
            "mode" "subscription"
            "line_items" [{"price" (-> config :stripe :premium-price-id)
@@ -425,8 +440,20 @@
                      body-str sig (-> secrets :stripe :webhook-secret))]
     (condp = (.getType evt)
       "checkout.session.completed"
-      (let [^Session session (-> evt .getDataObjectDeserializer .getObject)]
-        (log/infof "would be completing the purchase here! =%s" session))
+      (let [^Session session (-> evt .getDataObjectDeserializer .getObject .get)
+            customer-id (.getCustomer session)
+            subscription-id (.getSubscription session)
+
+            {:keys [uid]} (db/get-user-by-customer-id customer-id)]
+        (db/save-payment-info uid {:customer-id customer-id
+                                   :subscription-id subscription-id})
+        (db/save-user-level uid :premium))
+      "customer.subscription.deleted"
+      (let [^Subscription subscription (-> evt .getDataObjectDeserializer .getObject .get)
+            customer-id (.getCustomer subscription)
+            {:keys [uid]} (db/get-user-by-customer-id customer-id)]
+        (db/save-payment-info uid {:customer-id customer-id})
+        (db/save-user-level uid :standard))
 
       (log/infof "ignoring evt %s " evt))
     (response {:receive true})))
@@ -452,7 +479,8 @@
     (POST "/magic/auth" [] magic-auth-handler)
 
     (POST "/me/invite-user" [] invite-user-handler)
-    (POST "/me/checkout/create-session" [] create-session-handler)))
+    (POST "/me/checkout/create-session" [] create-session-handler)
+    (POST "/me/checkout/cancel-subscription" [] cancel-subscription-handler)))
 
 (defroutes
   static-routes
