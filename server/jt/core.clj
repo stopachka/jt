@@ -64,17 +64,6 @@
 ;; ------------------------------------------------------------------------------
 ;; DB
 
-(defn email->id [email]
-  (-> email
-      (str/replace #"\." "-")
-      (str/replace #"@" "_")))
-
-(defn journal-path [email zoned-date]
-  (str "/journals/"
-       (email->id email)
-       "/"
-       (->numeric-date-str zoned-date)))
-
 (defn task-path [task-id]
   (str "/tasks/" task-id))
 

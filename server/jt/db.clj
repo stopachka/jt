@@ -249,25 +249,6 @@
          (map (comp ->entry second)))))
 
 ;; ------------------------------------------------------------------------------
-;; TODO delete me migrate journals
-
-(defn email->id [email]
-  (-> email
-      (str/replace #"\." "-")
-      (str/replace #"@" "_")))
-
-(defn migrate-journal [{:keys [uid email] :as _user}]
-  (let [old-journals (firebase-fetch (firebase-ref (str "/journals/" (email->id email))))
-        ->entry (fn [[k j]]
-                        (let [date (-> (LocalDate/parse (name k))
-                                       (.atTime 17 0)
-                                       (ZonedDateTime/of (ZoneId/of "America/Los_Angeles")))]
-                          (assoc j :date date)))]
-    (->> old-journals
-         (pmap (comp (partial save-entry uid) ->entry))
-         doall)))
-
-;; ------------------------------------------------------------------------------
 ;; init
 
 (defn init []

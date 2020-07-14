@@ -320,7 +320,7 @@ class Journals extends React.Component {
     if (isLoadingJournals) {
       return <div>Loading...</div>;
     }
-    const journalEntries = Object.values(journals || {});
+    const journalEntries = Object.entries(journals || {});
     if (journalEntries.length === 0) {
       return (
         <div>You don't have journals yet. You'll see them here soon : ]</div>
@@ -329,17 +329,17 @@ class Journals extends React.Component {
     return (
       <div>
         {journalEntries
-          .sort((a, b) => +new Date(b["at-ms"]) - +new Date(a["at-ms"]))
-          .map((j) => {
+          .sort(([ka, _a], [kb, _b]) => +kb - +ka)
+          .map(([k, j]) => {
             return (
-              <div key={j["at-ms"]}>
+              <div key={k}>
                 <button
                   onClick={(e) => {
                     firebase
                       .database()
                       .ref(
                         `/entries/${firebase.auth().currentUser.uid}/${
-                          j["at-ms"]
+                          k
                         }`
                       )
                       .set(null);
@@ -348,7 +348,7 @@ class Journals extends React.Component {
                   delete
                 </button>
                 <h3>
-                  {new Date(j["at-ms"]).toLocaleString("en-US", {
+                  {new Date(j["date"]).toLocaleString("en-US", {
                     weekday: "short",
                     month: "long",
                     day: "numeric",
