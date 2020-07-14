@@ -455,13 +455,9 @@
 
 (defn -main []
   (db/init)
-  (set! (. Stripe -apiKey) (profile/get-secret :stripe :api-key))
-  (fut-bg (chime-core/chime-at
-            (reminder-period)
-            handle-reminder))
-  (fut-bg (chime-core/chime-at
-            (summary-period)
-            handle-summary))
+  (set! (. Stripe -apiKey) (profile/get-secret :stripe :secret-key))
+  (fut-bg (chime-core/chime-at (reminder-period) handle-reminder))
+  (fut-bg (chime-core/chime-at (summary-period) handle-summary))
   (let [port (profile/get-config :port)
         app (routes
               (-> webhook-routes

@@ -21,11 +21,12 @@
       slurp
       edn/read-string))
 
+(def secrets (read-edn-resource (-> file-sources :secrets env)))
+
 (def config (read-edn-resource (-> file-sources :config env)))
-(def secrets (read-edn-resource (-> file-sources :config env)))
 
 (defn get-secret [& ks]
-  (get-in config ks))
+  (get-in secrets ks))
 
 (defn get-config [& ks]
-  (get-in secrets ks))
+  (get-in config ks))
