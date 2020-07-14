@@ -294,12 +294,15 @@ class Journals extends React.Component {
       );
     firebase
       .database()
-      .ref(`/users/${firebase.auth().currentUser.uid}/journals`)
+      .ref(`/entries/${firebase.auth().currentUser.uid}/`)
       .on("value", (snap) => {
         this.setState({
           journals: snap.val(),
           isLoadingJournals: false,
         });
+      }, err => {
+        console.log(`/entries/${firebase.auth().currentUser.uid}/`);
+        this.setState({errorMessage: "oi can't access journals"});
       });
   }
 
@@ -312,7 +315,7 @@ class Journals extends React.Component {
       level,
     } = this.state;
     if (errorMessage) {
-      return <div>Error message</div>;
+      return <div>{errorMessage}</div>;
     }
     if (isLoadingJournals) {
       return <div>Loading...</div>;
@@ -335,7 +338,7 @@ class Journals extends React.Component {
                     firebase
                       .database()
                       .ref(
-                        `/users/${firebase.auth().currentUser.uid}/journals/${
+                        `/entries/${firebase.auth().currentUser.uid}/${
                           j["at-ms"]
                         }`
                       )

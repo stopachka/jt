@@ -2,7 +2,8 @@
   (:require [jt.concurrency :refer [fut-bg throwable-promise]]
             [clojure.walk :refer [stringify-keys]]
             [clojure.string :as str]
-            [jt.profile :as profile])
+            [jt.profile :as profile]
+            [clojure.tools.logging :as log])
   (:import (com.google.auth.oauth2 ServiceAccountCredentials)
            (com.google.firebase FirebaseOptions$Builder FirebaseApp)
            (com.google.firebase.database
@@ -203,9 +204,10 @@
 (def journal-keys #{:sender :subject :stripped-text :stripped-html
                     :recipient :body-html :body-plain :at-ms})
 
-(defn save-journal [uid {:keys [at-ms] :as j}]
+(defn save-entry [uid {:keys [at-ms] :as j}]
+  (log/infof "saving entry! %s" j)
   (firebase-save
-    (firebase-ref (str "/users/" uid "/journals/" at-ms))
+    (firebase-ref (str "/entries/" uid "/" at-ms))
     (select-keys j journal-keys)))
 
 (defn email->id [email]
@@ -215,7 +217,7 @@
 
 (defn migrate-journal [{:keys [uid email] :as _user}]
   (let [old-journals (firebase-fetch (firebase-ref (str "/journals/" (email->id email))))
-        ->new-journal (fn [[k j]]
+        ->entry (fn [[k j]]
                         (let [at-ms (or (:at j)
                                         (-> (LocalDate/parse (name k))
                                             (.atTime 17 0)
@@ -225,7 +227,7 @@
                           (-> j
                               (assoc :at-ms at-ms))))]
     (->> old-journals
-         (pmap (comp (partial save-journal uid) ->new-journal)))))
+         (pmap (comp (partial save-entry uid) ->entry)))))
 
 ;; ------------------------------------------------------------------------------
 ;; init
