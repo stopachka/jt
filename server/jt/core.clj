@@ -307,8 +307,7 @@
       (condp = recipient
         hows-your-day-email
         (handle-hows-your-day-response data)
-
-        :else
+        
         (log/infof "skipping for recipient=%s sender=%s" recipient sender))))
   (response {:receive true}))
 

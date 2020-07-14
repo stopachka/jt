@@ -1,9 +1,7 @@
 (ns jt.db
   (:require [jt.concurrency :refer [fut-bg throwable-promise]]
             [clojure.walk :refer [stringify-keys]]
-            [clojure.string :as str]
-            [jt.profile :as profile]
-            [clojure.tools.logging :as log])
+            [jt.profile :as profile])
   (:import (com.google.auth.oauth2 ServiceAccountCredentials)
            (com.google.firebase FirebaseOptions$Builder FirebaseApp)
            (com.google.firebase.database
