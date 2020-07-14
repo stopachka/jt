@@ -41,6 +41,10 @@
   "i.e Wed Jul 1"
   "E LLL d")
 
+(def friend-date-time-pattern
+  "Tue 07 14 02:56 PM PDT"
+  "E LL d hh:mm a zz")
+
 (def day-of-week-pattern
   "i.e Wednesday"
   "EEEE")
@@ -79,10 +83,11 @@
 
 (defn send-email [content]
   (log/infof "[mail] sending content=%s" content)
-  (mail/send-mail
-    {:key (profile/get-secret :mailgun :api-key)
-     :domain (profile/get-config :mailgun :domain)}
-    content))
+  (when (= profile/env :prod)
+    (mail/send-mail
+      {:key (profile/get-secret :mailgun :api-key)
+       :domain (profile/get-config :mailgun :domain)}
+      content)))
 
 ;; ------------------------------------------------------------------------------
 ;; Schedule
@@ -131,9 +136,9 @@
 (def signup-email-with-name
   (email-with-name signup-email "Journal Signup"))
 
-(defn content-hows-your-day? [day]
+(defn content-hows-your-day? [day email]
   {:from hows-your-day-email-with-name
-   :to (profile/get-secret :friends)
+   :to email
    :subject (str
               (fmt-with-pattern friendly-date-pattern day)
               " — 👋 How was your day?")
@@ -145,25 +150,33 @@
         "How was your day today? What's been on your mind? 😊 📝"
         "</p>")})
 
-(defn journal-entry->html [{:keys [sender stripped-text]}]
+(defn ->entry-html [{:keys [date stripped-text]}]
   (str
     "<p><b>"
-    sender
+    (fmt-with-pattern friend-date-time-pattern date)
     "</b></p>"
     "<br>"
     (markdown-core/md-to-html-string stripped-text)))
 
-(defn content-summary [day entries]
+(defn ->user-section-html [[{:keys [email] :as _user} entries]]
+  (str
+    "<h3>"email"</h3>"
+    (->> entries
+         (filter seq)
+         (map ->entry-html)
+         str/join)))
+
+(defn content-summary [day to users-with-entries]
   (let [friendly-date-str (fmt-with-pattern friendly-date-pattern day)]
     {:from summary-email-with-name
-     :to (profile/get-secret :friends)
+     :to to
      :subject (str "☀️ Here's how things went " friendly-date-str)
      :html
      (str "<p>"
           "Howdy, Here's how things have went on " friendly-date-str
           "</p>"
-          (->> entries
-               (map journal-entry->html)
+          (->> users-with-entries
+               (map ->user-section-html)
                str/join))}))
 
 (defn content-ack-receive [to, subject]
@@ -224,14 +237,19 @@
 
 (defn handle-reminder [_]
   (let [day (pst-now)
-        task-id (str "reminder-" (->numeric-date-str day))]
+        task-id (str "send-reminder-" (->numeric-date-str day))]
     (when (try-grab-task task-id)
-      (send-email (content-hows-your-day? (pst-now))))))
+      (->> (db/get-all-users)
+           (pmap (fn [{:keys [email] :as user}]
+                   (try
+                     (send-email (content-hows-your-day? day email))
+                     (catch Exception e
+                       (log/errorf e "failed to send reminder for user = %s" user)))))))))
 
 (defn send-summary
-  [day group-id group]
-  (when (try-grab-task (str "summary-group-" group-id))
-    (let [yesterday (.minusDays day 1)
+  [start-date group-id group]
+  (when (try-grab-task (str "summary-group-" group-id (->numeric-date-str start-date)))
+    (let [end-date (.plusDays start-date 1)
           users (->> group
                      :users
                      keys
@@ -240,17 +258,23 @@
           users-with-entries (->> users
                                   (pmap (fn [{:keys [uid] :as u}]
                                           [u (db/get-entries-between
-                                               uid yesterday day)])))]
-      (send-email (content-summary day users-with-entries)))))
+                                               uid start-date end-date)]))
+                                  (filter (comp seq second)))]
+      (cond
+        (not (seq users-with-entries))
+        (log/infof "skipping group, no entries group=%s " group)
+
+        :else
+        (content-summary start-date (map :email users) users-with-entries)))))
 
 (defn handle-summary [_]
-  (let [day (.minusDays (pst-now) 1)
-        task-id (str "handle-summary-" (->numeric-date-str day))]
-    (when (try-grab-task task-id)
+  (let [start-date (.minusDays (pst-now) 1)
+        task-id (str "handle-summary-" (->numeric-date-str start-date))]
+    (when (or true (try-grab-task task-id))
       (->> (db/get-all-groups)
-           (pmap (fn [k g]
+           (pmap (fn [[k g]]
                    (try
-                     (send-summary day k g)
+                     (send-summary start-date k g)
                      (catch Exception e
                        (log/errorf e "failed to send summary to group %s" g)))))
            doall))))

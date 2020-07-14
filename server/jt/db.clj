@@ -122,6 +122,17 @@
       (.verifyIdToken token)
       user-record->map))
 
+(defn get-all-users []
+  (loop [ret []
+         page (-> (FirebaseAuth/getInstance)
+                  (.listUsers nil))]
+    (if page
+      (recur (concat
+               ret
+               (map user-record->map (.getValues page)))
+             (.getNextPage page))
+      ret)))
+
 (defn get-user-by-customer-id [customer-id]
   (let [id-kws (-> (firebase-ref "/users/")
                    (.orderByChild "/payment-info/customer-id")
@@ -225,11 +236,11 @@
         (select-keys entry-keys)
         (update :date #(.format entry-date-formatter %)))))
 
-(defn get-entries-between [uid start-ms end-ms]
+(defn get-entries-between [uid start-date end-date]
   (let [entries (-> (firebase-ref (str "/entries/" uid "/"))
                     .orderByKey
-                    (.startAt (str start-ms))
-                    (.endAt (str end-ms))
+                    (.startAt (str (->epoch-milli start-date)))
+                    (.endAt (str (->epoch-milli end-date)))
                     firebase-fetch)
         ->entry (fn [x]
                   (update x :date #(ZonedDateTime/parse % entry-date-formatter)))]
