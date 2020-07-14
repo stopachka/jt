@@ -145,6 +145,10 @@
 ;; groups
 
 (def group-root "/groups/")
+
+(defn get-all-groups []
+  (firebase-fetch (firebase-ref group-root)))
+
 (defn get-group-by-id [id]
   (firebase-fetch (firebase-ref (str group-root id))))
 

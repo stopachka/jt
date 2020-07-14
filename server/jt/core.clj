@@ -228,18 +228,32 @@
     (when (try-grab-task task-id)
       (send-email (content-hows-your-day? (pst-now))))))
 
+(defn send-summary
+  [day group-id group]
+  (when (try-grab-task (str "summary-group-" group-id))
+    (let [yesterday (.minusDays day 1)
+          users (->> group
+                     :users
+                     keys
+                     (map name)
+                     (pmap db/get-user-by-uid))
+          users-with-entries (->> users
+                                  (pmap (fn [{:keys [uid] :as u}]
+                                          [u (db/get-entries-between
+                                               uid yesterday day)])))]
+      (send-email (content-summary day users-with-entries)))))
+
 (defn handle-summary [_]
   (let [day (.minusDays (pst-now) 1)
-        task-id (str "summary-" (->numeric-date-str day))]
+        task-id (str "handle-summary-" (->numeric-date-str day))]
     (when (try-grab-task task-id)
-      (let [entries (->> (profile/get-secret :friends)
-                         (pmap (fn [email]
-                                 (db/firebase-fetch
-                                   (db/firebase-ref (journal-path email day)))))
-                         (filter seq))]
-        (if-not (seq entries)
-          (log/infof "skipping for %s because there are no entries" day)
-          (send-email (content-summary day entries)))))))
+      (->> (db/get-all-groups)
+           (pmap (fn [k g]
+                   (try
+                     (send-summary day k g)
+                     (catch Exception e
+                       (log/errorf e "failed to send summary to group %s" g)))))
+           doall))))
 
 ;; ------------------------------------------------------------------------------
 ;; Incoming Mail
