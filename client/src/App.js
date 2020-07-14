@@ -4,6 +4,7 @@ import { withRouter } from "react-router";
 import { BrowserRouter as Router, Switch, Route, Link } from "react-router-dom";
 import * as firebase from "firebase/app";
 import { loadStripe } from "@stripe/stripe-js";
+import marked from "marked";
 
 // Set up Firebase
 import "firebase/auth";
@@ -272,12 +273,99 @@ class Journals extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      isLoading: true,
+      isLoadingJournals: true,
       errorMessage: null,
+      isLoadingLevel: true,
+      journals: null,
+      level: null,
     };
   }
+  componentDidMount() {
+    firebase
+      .database()
+      .ref(`/users/${firebase.auth().currentUser.uid}/level`)
+      .on("value", (snap) =>
+        this.setState({ isLoadingLevel: false, level: snap.val() })
+      );
+    firebase
+      .database()
+      .ref(`/users/${firebase.auth().currentUser.uid}/journals`)
+      .on("value", (snap) => {
+        this.setState({
+          journals: snap.val(),
+          isLoadingJournals: false,
+        });
+      });
+  }
+
   render() {
-    return <h1>Journals!</h1>;
+    const {
+      isLoadingJournals,
+      isLoadingLevel,
+      errorMessage,
+      journals,
+      level,
+    } = this.state;
+    if (errorMessage) {
+      return <div>Error message</div>;
+    }
+    if (isLoadingJournals) {
+      return <div>Loading...</div>;
+    }
+    const journalEntries = Object.values(journals || {});
+    if (journalEntries.length === 0) {
+      return (
+        <div>You don't have journals yet. You'll see them here soon : ]</div>
+      );
+    }
+    return (
+      <div>
+        {journalEntries
+          .sort((a, b) => +new Date(b["at-ms"]) - +new Date(a["at-ms"]))
+          .map((j) => {
+            return (
+              <div key={j["at-ms"]}>
+                <button
+                  onClick={(e) => {
+                    firebase
+                      .database()
+                      .ref(
+                        `/users/${firebase.auth().currentUser.uid}/journals/${
+                          j["at-ms"]
+                        }`
+                      )
+                      .set(null);
+                  }}
+                >
+                  delete
+                </button>
+                <h3>
+                  {new Date(j["at-ms"]).toLocaleString("en-US", {
+                    weekday: "short",
+                    month: "long",
+                    day: "numeric",
+                    hour: "numeric",
+                  })}
+                </h3>
+                <div
+                  dangerouslySetInnerHTML={{
+                    __html: marked(j["stripped-text"]),
+                  }}
+                ></div>
+                <hr />
+              </div>
+            );
+          })}
+        {!isLoadingLevel && level !== "premium" ? (
+          <div>
+            <h3>
+              Want to access journals gr 1 month? Upgrade to premium!{" "}
+              <Link to="/me/account">Learn more</Link>
+            </h3>
+          </div>
+        ) : null}
+      </div>
+    );
   }
 }
 
@@ -333,7 +421,7 @@ class Account extends React.Component {
                 .then(
                   (x) => this.setState({ isLoading: false }),
                   (e) => {
-                    debugger
+                    debugger;
                     this.setState({
                       isLoading: false,
                       errorMessage: "Oh boy. can't downgrade ya.",

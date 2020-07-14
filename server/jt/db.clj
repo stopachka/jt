@@ -1,6 +1,7 @@
 (ns jt.db
   (:require [jt.concurrency :refer [fut-bg throwable-promise]]
-            [clojure.walk :refer [stringify-keys]])
+            [clojure.walk :refer [stringify-keys]]
+            [clojure.string :as str])
   (:import (com.google.auth.oauth2 ServiceAccountCredentials)
            (com.google.firebase FirebaseOptions$Builder FirebaseApp)
            (com.google.firebase.database
@@ -9,7 +10,9 @@
              DatabaseReference$CompletionListener DatabaseReference Query)
            (com.google.firebase.auth
              FirebaseAuth UserRecord$CreateRequest FirebaseAuthException)
-           (com.stripe.model Customer)))
+           (com.stripe.model Customer)
+           (java.time.format DateTimeFormatter)
+           (java.time LocalDate ZonedDateTime ZoneId)))
 
 (defprotocol ConvertibleToClojure
   "Converts nested java objects to clojure objects.
@@ -193,6 +196,36 @@
   (when-let [res (get-magic-code code)]
     (kill-magic-code code)
     res))
+
+;; ------------------------------------------------------------------------------
+;; migrate-journals
+
+(def journal-keys #{:sender :subject :stripped-text :stripped-html
+                    :recipient :body-html :body-plain :at-ms})
+
+(defn save-journal [uid {:keys [at-ms] :as j}]
+  (firebase-save
+    (firebase-ref (str "/users/" uid "/journals/" at-ms))
+    (select-keys j journal-keys)))
+
+(defn email->id [email]
+  (-> email
+      (str/replace #"\." "-")
+      (str/replace #"@" "_")))
+
+(defn migrate-journal [{:keys [uid email] :as _user}]
+  (let [old-journals (firebase-fetch (firebase-ref (str "/journals/" (email->id email))))
+        ->new-journal (fn [[k j]]
+                        (let [at-ms (or (:at j)
+                                        (-> (LocalDate/parse (name k))
+                                            (.atTime 17 0)
+                                            (ZonedDateTime/of (ZoneId/of "America/Los_Angeles"))
+                                            .toInstant
+                                            .toEpochMilli))]
+                          (-> j
+                              (assoc :at-ms at-ms))))]
+    (->> old-journals
+         (pmap (comp (partial save-journal uid) ->new-journal)))))
 
 ;; ------------------------------------------------------------------------------
 ;; init
