@@ -20,7 +20,12 @@ firebase.initializeApp({
   measurementId: "G-GYBL76DZQW",
 });
 
-const stripePromise = loadStripe("pk_test_1iGrM3ZC85K4LbvyaphPMBr6");
+const STRIPE_PK =
+  process.env.NODE_ENV === "production"
+    ? "pk_live_erHEE5TRgYAlgqMkadDK7zmA"
+    : "pk_test_1iGrM3ZC85K4LbvyaphPMBr6";
+
+const stripePromise = loadStripe(STRIPE_PK);
 
 function serverPath(path) {
   const root =

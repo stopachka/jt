@@ -1,7 +1,8 @@
 (ns jt.db
   (:require [jt.concurrency :refer [fut-bg throwable-promise]]
             [clojure.walk :refer [stringify-keys]]
-            [clojure.string :as str])
+            [clojure.string :as str]
+            [jt.profile :as profile])
   (:import (com.google.auth.oauth2 ServiceAccountCredentials)
            (com.google.firebase FirebaseOptions$Builder FirebaseApp)
            (com.google.firebase.database
@@ -11,7 +12,6 @@
            (com.google.firebase.auth
              FirebaseAuth UserRecord$CreateRequest FirebaseAuthException)
            (com.stripe.model Customer)
-           (java.time.format DateTimeFormatter)
            (java.time LocalDate ZonedDateTime ZoneId)))
 
 (defprotocol ConvertibleToClojure
@@ -230,13 +230,13 @@
 ;; ------------------------------------------------------------------------------
 ;; init
 
-(defn init [config secrets]
-  (let [{:keys [db-url auth project-id]} (:firebase config)
+(defn init []
+  (let [{:keys [db-url auth project-id]} (profile/get-config :firebase)
         {:keys
          [client-id
           client-email
           private-key
-          private-key-id]} (:firebase secrets)
+          private-key-id]} (profile/get-secret :firebase)
         creds (ServiceAccountCredentials/fromPkcs8
                 client-id
                 client-email

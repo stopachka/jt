@@ -7,5 +7,5 @@ secrets
 pom.xml
 startup-script.sh
 shutdown-script.sh
-resources/secrets.edn
+resources/profile/secrets*
 resources/public

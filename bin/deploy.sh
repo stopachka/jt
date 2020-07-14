@@ -31,7 +31,7 @@ gsutil cp '${STORAGE_PATH}' jt.jar
 chmod +x jt.jar
 
 # kick off jar
-java -Dclojure.server.repl="{:port 50505 :accept clojure.core.server/repl}" -Dlogback.configurationFile="logback-production.xml" -cp jt.jar clojure.main -m jt.core &
+PRODUCTION=true java -Dclojure.server.repl="{:port 50505 :accept clojure.core.server/repl}" -Dlogback.configurationFile="logback-production.xml" -cp jt.jar clojure.main -m jt.core &
 ' > startup-script.sh
 
 # Shutdown Script

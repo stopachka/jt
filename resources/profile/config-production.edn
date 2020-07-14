@@ -1,0 +1,12 @@
+{:port 8080
+ :static-root "public"
+ :mailgun {:domain "mg.journaltogether.com"}
+ :stripe
+ {:premium-price-id "price_1H4E1BGnGs7xopb5CNZ33pxL"
+  :session
+  {:success-url "https://www.journaltogether.com/me/checkout/success?session_id={CHECKOUT_SESSION_ID}"
+   :cancel-url "https://www.journaltogether.com/me/account"}}
+ :firebase
+ {:auth {:uid "jt-sv"}
+  :project-id "journaltogether"
+  :db-url "https://journaltogether.firebaseio.com"}}

@@ -1,12 +1,11 @@
 (ns jt.core
   (:gen-class)
   (:require [chime.core :as chime-core]
-            [clojure.edn :as edn]
-            [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.tools.logging :as log]
             [jt.db :as db]
             [jt.concurrency :refer [fut-bg]]
+            [jt.profile :as profile]
             [compojure.core :refer [context routes defroutes GET POST]]
             [compojure.route :refer [resources]]
             [io.aviso.logging.setup]
@@ -29,14 +28,6 @@
 
 ;; ------------------------------------------------------------------------------
 ;; Helpers
-
-(defn read-edn-resource
-  "Transforms a resource in our classpath to edn"
-  [path]
-  (-> path
-      io/resource
-      slurp
-      edn/read-string))
 
 (def email-pattern #"(?i)[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?")
 (defn email?
@@ -72,24 +63,6 @@
       .toEpochMilli))
 
 ;; ------------------------------------------------------------------------------
-;; Config
-
-(def secrets (read-edn-resource "secrets.edn"))
-
-(def config
-  {:port 8080
-   :static-root "public"
-   :mailgun {:domain "mg.journaltogether.com"}
-   :stripe {:premium-price-id "price_1H4IDVGnGs7xopb5ZhBQ2hnU"}
-   :firebase
-   {:auth {:uid "jt-sv"}
-    :project-id "journaltogether"
-    :db-url "https://journaltogether.firebaseio.com"}})
-
-(def friends
-  (:friends secrets))
-
-;; ------------------------------------------------------------------------------
 ;; DB
 
 (defn email->id [email]
@@ -109,12 +82,12 @@
 ;; ------------------------------------------------------------------------------
 ;; Mail
 
-(def mailgun-creds {:key (-> secrets :mailgun :api-key)
-                    :domain (-> config :mailgun :domain)})
-
 (defn send-email [content]
   (log/infof "[mail] sending content=%s" content)
-  (mail/send-mail mailgun-creds content))
+  (mail/send-mail
+    {:key (profile/get-secret :mailgun :api-key)
+     :domain (profile/get-secret :mailgun :domain)}
+    content))
 
 ;; ------------------------------------------------------------------------------
 ;; Schedule
@@ -165,7 +138,7 @@
 
 (defn content-hows-your-day? [day]
   {:from hows-your-day-email-with-name
-   :to friends
+   :to (profile/get-secret :friends)
    :subject (str
               (fmt-with-pattern friendly-date-pattern day)
               " — 👋 How was your day?")
@@ -188,7 +161,7 @@
 (defn content-summary [day entries]
   (let [friendly-date-str (fmt-with-pattern friendly-date-pattern day)]
     {:from summary-email-with-name
-     :to friends
+     :to (profile/get-secret :friends)
      :subject (str "☀️ Here's how things went " friendly-date-str)
      :html
      (str "<p>"
@@ -262,7 +235,7 @@
   (let [day (.minusDays (pst-now) 1)
         task-id (str "summary-" (->numeric-date-str day))]
     (when (try-grab-task task-id)
-      (let [entries (->> friends
+      (let [entries (->> (profile/get-secret :friends)
                          (pmap (fn [email]
                                  (db/firebase-fetch
                                    (db/firebase-ref (journal-path email day)))))
@@ -324,12 +297,6 @@
         :else
         (log/infof "skipping for recipient=%s sender=%s" recipient sender))))
   (response {:receive true}))
-
-(comment
-  (do
-    (def _req (read-edn-resource "api-emails-req.edn"))
-    (def _res (emails-handler _req))
-    _res))
 
 ;; ------------------------------------------------------------------------------
 ;; magic codes
@@ -422,13 +389,11 @@
 
         session
         (Session/create
-          {"success_url"
-           "http://localhost:3000/me/checkout/success?session_id={CHECKOUT_SESSION_ID}"
-           "cancel_url"
-           "http://localhost:3000/me/account"
+          {"success_url" (profile/get-config :stripe :session :success-url)
+           "cancel_url" (profile/get-config :stripe :session :cancel-url)
            "customer" customer-id
            "mode" "subscription"
-           "line_items" [{"price" (-> config :stripe :premium-price-id)
+           "line_items" [{"price" (profile/get-config :stripe :premium-price-id)
                           "quantity" 1}]
            "payment_method_types" ["card"]})]
     (response {:id (.getId session)})))
@@ -437,7 +402,9 @@
   (let [sig (get headers "stripe-signature")
         body-str (body-string req)
         ^Event evt (Webhook/constructEvent
-                     body-str sig (-> secrets :stripe :webhook-secret))]
+                     body-str
+                     sig
+                     (profile/get-secret :stripe :webhook-secret))]
     (condp = (.getType evt)
       "checkout.session.completed"
       (let [^Session session (-> evt .getDataObjectDeserializer .getObject .get)
@@ -461,10 +428,9 @@
 ;; ------------------------------------------------------------------------------
 ;; Server
 
-(def static-root (:static-root config))
 (defn render-static-file [filename]
   (resp/content-type
-    (resp/resource-response filename {:root static-root}) "text/html"))
+    (resp/resource-response filename {:root (profile/get-config :static-root)}) "text/html"))
 
 (defroutes
   webhook-routes
@@ -484,19 +450,19 @@
 
 (defroutes
   static-routes
-  (resources "/" {:root static-root})
+  (resources "/" {:root (profile/get-config :static-root)})
   (GET "*" [] (render-static-file "index.html")))
 
 (defn -main []
-  (db/init config secrets)
-  (set! (. Stripe -apiKey) (-> secrets :stripe :secret-key))
+  (db/init)
+  (set! (. Stripe -apiKey) (profile/get-secret :stripe :api-key))
   (fut-bg (chime-core/chime-at
             (reminder-period)
             handle-reminder))
   (fut-bg (chime-core/chime-at
             (summary-period)
             handle-summary))
-  (let [{:keys [port]} config
+  (let [port (profile/get-config :port)
         app (routes
               (-> webhook-routes
                   wrap-json-response)
