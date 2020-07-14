@@ -89,10 +89,10 @@
 
 (defn create-user [email]
   (let [user (-> (FirebaseAuth/getInstance)
-                          (.createUser (-> (UserRecord$CreateRequest.)
-                                           (.setEmail email)
-                                           (.setEmailVerified true)))
-                          user-record->map)]
+                 (.createUser (-> (UserRecord$CreateRequest.)
+                                  (.setEmail email)
+                                  (.setEmailVerified true)))
+                 user-record->map)]
     (create-payment-info user)
     user))
 
@@ -198,7 +198,7 @@
     res))
 
 ;; ------------------------------------------------------------------------------
-;; migrate-journals
+;; TODO delete me soon migrate-journals
 
 (def journal-keys #{:sender :subject :stripped-text :stripped-html
                     :recipient :body-html :body-plain :at-ms})
