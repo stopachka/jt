@@ -57,11 +57,6 @@
 (defn ->numeric-date-str [zoned-date]
   (fmt-with-pattern numeric-date-pattern zoned-date))
 
-(defn ->epoch-milli [zoned-date]
-  (-> zoned-date
-      .toInstant
-      .toEpochMilli))
-
 ;; ------------------------------------------------------------------------------
 ;; DB
 
@@ -177,14 +172,6 @@
    :subject subject
    :html "Oky doke, received this 👌"})
 
-(defn content-already-received [to, subject]
-  {:from hows-your-day-email-with-name
-   :to to
-   :subject subject
-   :html (str
-           "<p>Oi, I already logged a journal entry for you.</p>"
-           "<p>I can't do much with this. Ping Stopa sry 🙈</p>")})
-
 (defn url-with-magic-code [magic-code]
   (str "https://www.journaltogether.com/magic/" magic-code))
 
@@ -208,6 +195,16 @@
      "<p>Hello there!</p>"
      "<p>" sender-email " has invited you to join their group on Journal Together</p>"
      "<p> Visit " (url-with-magic-code magic-code) " to join them")})
+
+(defn content-user-does-not-exist [from to subject]
+  {:from from
+   :to to
+   :subject subject
+   :html
+   (str
+     "<p>Oi, you need to sign up to use journaltogether</p>"
+     "<p>Visit https://journaltogether.com/me to sign up</p>")})
+
 
 ;; ------------------------------------------------------------------------------
 ;; Outgoing Mail
@@ -257,35 +254,25 @@
       :Date
       (ZonedDateTime/parse mailgun-date-formatter)))
 
-(def email-keys
-  #{:sender :subject :stripped-text :stripped-html
-    :recipient :body-html :body-plain :at})
-
 ;; ------------------------------------------------------------------------------
 ;; handle-hows-your-day-response
 
-(defn data->journal [data]
-  (-> data
-      (assoc :at (->epoch-milli (:date data)))
-      (select-keys email-keys)))
-
 (defn handle-hows-your-day-response [data]
-  (let [{:keys [sender subject date]} data
-        email (data->journal data)]
+  (let [{:keys [sender recipient subject]} data
+        {:keys [uid] :as _user} (db/get-user-by-email sender)]
     (cond
-      (seq (db/firebase-fetch (db/firebase-ref
-                                (journal-path sender date))))
-      (send-email (content-already-received sender subject))
+      (not uid)
+      (send-email (content-user-does-not-exist recipient sender subject))
 
       :else
       (do
-        (db/firebase-save (db/firebase-ref (journal-path sender date)) email)
+        (db/save-entry uid data)
         (send-email (content-ack-receive sender subject))))))
 
 ;; ------------------------------------------------------------------------------
 ;; emails-handler
 
-(defn emails-handler [{:keys [params] :as req}]
+(defn emails-handler [{:keys [params] :as _req}]
   (fut-bg
     (let [{:keys [recipient sender] :as data}
           (-> params
@@ -378,7 +365,8 @@
       (bad-request {:code "already_canceled"})
 
       :else
-      (.cancel sub))
+      (do (.cancel sub)
+          (db/save-user-level uid :standard)))
     (response {:receive true})))
 
 (defn create-session-handler [{:keys [headers] :as _req}]
@@ -398,6 +386,27 @@
            "payment_method_types" ["card"]})]
     (response {:id (.getId session)})))
 
+(defn handle-stripe-webhook-event [evt]
+  (condp = (.getType evt)
+    "checkout.session.completed"
+    (let [^Session session (-> evt .getDataObjectDeserializer .getObject .get)
+          customer-id (.getCustomer session)
+          subscription-id (.getSubscription session)
+
+          {:keys [uid]} (db/get-user-by-customer-id customer-id)]
+      (db/save-payment-info uid {:customer-id customer-id
+                                 :subscription-id subscription-id})
+      (db/save-user-level uid :premium))
+
+    "customer.subscription.deleted"
+    (let [^Subscription subscription (-> evt .getDataObjectDeserializer .getObject .get)
+          customer-id (.getCustomer subscription)
+          {:keys [uid]} (db/get-user-by-customer-id customer-id)]
+      (db/save-payment-info uid {:customer-id customer-id})
+      (db/save-user-level uid :standard))
+
+    (log/infof "ignoring evt %s " evt)))
+
 (defn webhooks-stripe-handler [{:keys [headers] :as req}]
   (let [sig (get headers "stripe-signature")
         body-str (body-string req)
@@ -405,24 +414,7 @@
                      body-str
                      sig
                      (profile/get-secret :stripe :webhook-secret))]
-    (condp = (.getType evt)
-      "checkout.session.completed"
-      (let [^Session session (-> evt .getDataObjectDeserializer .getObject .get)
-            customer-id (.getCustomer session)
-            subscription-id (.getSubscription session)
-
-            {:keys [uid]} (db/get-user-by-customer-id customer-id)]
-        (db/save-payment-info uid {:customer-id customer-id
-                                   :subscription-id subscription-id})
-        (db/save-user-level uid :premium))
-      "customer.subscription.deleted"
-      (let [^Subscription subscription (-> evt .getDataObjectDeserializer .getObject .get)
-            customer-id (.getCustomer subscription)
-            {:keys [uid]} (db/get-user-by-customer-id customer-id)]
-        (db/save-payment-info uid {:customer-id customer-id})
-        (db/save-user-level uid :standard))
-
-      (log/infof "ignoring evt %s " evt))
+    (fut-bg (handle-stripe-webhook-event evt))
     (response {:receive true})))
 
 ;; ------------------------------------------------------------------------------

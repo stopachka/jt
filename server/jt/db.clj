@@ -13,7 +13,8 @@
            (com.google.firebase.auth
              FirebaseAuth UserRecord$CreateRequest FirebaseAuthException)
            (com.stripe.model Customer)
-           (java.time LocalDate ZonedDateTime ZoneId)))
+           (java.time LocalDate ZonedDateTime ZoneId)
+           (java.time.format DateTimeFormatter)))
 
 (defprotocol ConvertibleToClojure
   "Converts nested java objects to clojure objects.
@@ -199,16 +200,41 @@
     res))
 
 ;; ------------------------------------------------------------------------------
-;; TODO delete me soon migrate-journals
+;; entries
 
-(def journal-keys #{:sender :subject :stripped-text :stripped-html
-                    :recipient :body-html :body-plain :at-ms})
+(defn ->epoch-milli [zoned-date]
+  (-> zoned-date
+      .toInstant
+      .toEpochMilli))
 
-(defn save-entry [uid {:keys [at-ms] :as j}]
-  (log/infof "saving entry! %s" j)
+(def entry-keys #{:sender :subject :stripped-text :stripped-html
+                    :recipient :body-html :body-plain :date})
+
+(def entry-date-formatter
+  (-> "EEE, d LLL yyyy HH:mm:ss ZZ"
+      DateTimeFormatter/ofPattern))
+
+(defn save-entry [uid {:keys [date] :as entry}]
   (firebase-save
-    (firebase-ref (str "/entries/" uid "/" at-ms))
-    (select-keys j journal-keys)))
+    (firebase-ref (str "/entries/" uid "/" (->epoch-milli date)))
+    (-> entry
+        (select-keys entry-keys)
+        (update :date #(.format entry-date-formatter %)))))
+
+(defn get-entries-between [uid start-ms end-ms]
+  (let [entries (-> (firebase-ref (str "/entries/" uid "/"))
+                    .orderByKey
+                    (.startAt (str start-ms))
+                    (.endAt (str end-ms))
+                    firebase-fetch)
+        ->entry (fn [x]
+                  (update x :date #(ZonedDateTime/parse % entry-date-formatter)))]
+    (->> entries
+         (sort-by first)
+         (map (comp ->entry second)))))
+
+;; ------------------------------------------------------------------------------
+;; TODO delete me migrate journals
 
 (defn email->id [email]
   (-> email
@@ -218,16 +244,13 @@
 (defn migrate-journal [{:keys [uid email] :as _user}]
   (let [old-journals (firebase-fetch (firebase-ref (str "/journals/" (email->id email))))
         ->entry (fn [[k j]]
-                        (let [at-ms (or (:at j)
-                                        (-> (LocalDate/parse (name k))
-                                            (.atTime 17 0)
-                                            (ZonedDateTime/of (ZoneId/of "America/Los_Angeles"))
-                                            .toInstant
-                                            .toEpochMilli))]
-                          (-> j
-                              (assoc :at-ms at-ms))))]
+                        (let [date (-> (LocalDate/parse (name k))
+                                       (.atTime 17 0)
+                                       (ZonedDateTime/of (ZoneId/of "America/Los_Angeles")))]
+                          (assoc j :date date)))]
     (->> old-journals
-         (pmap (comp (partial save-entry uid) ->entry)))))
+         (pmap (comp (partial save-entry uid) ->entry))
+         doall)))
 
 ;; ------------------------------------------------------------------------------
 ;; init
