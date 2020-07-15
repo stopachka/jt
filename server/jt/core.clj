@@ -144,7 +144,6 @@
     "<p><b>"
     (fmt-with-pattern friend-date-time-pattern date)
     "</b></p>"
-    "<br>"
     (markdown-core/md-to-html-string stripped-text)))
 
 (defn ->user-section-html [[{:keys [email] :as _user} entries]]
@@ -254,12 +253,13 @@
         (log/infof "skipping group, no entries group=%s " group)
 
         :else
-        (content-summary start-date (map :email users) users-with-entries)))))
+        (send-email
+          (content-summary start-date (map :email users) users-with-entries))))))
 
 (defn handle-summary [_]
   (let [start-date (.minusDays (pst-now) 1)
         task-id (str "handle-summary-" (->numeric-date-str start-date))]
-    (when (or true (try-grab-task task-id))
+    (when (try-grab-task task-id)
       (->> (db/get-all-groups)
            (pmap (fn [[k g]]
                    (try
@@ -307,7 +307,7 @@
       (condp = recipient
         hows-your-day-email
         (handle-hows-your-day-response data)
-        
+
         (log/infof "skipping for recipient=%s sender=%s" recipient sender))))
   (response {:receive true}))
 
@@ -472,6 +472,10 @@
   (GET "*" [] (render-static-file "index.html")))
 
 (defn -main []
+  (Thread/setDefaultUncaughtExceptionHandler
+    (reify Thread$UncaughtExceptionHandler
+      (uncaughtException [_ thread e]
+        (log/error e "Uncaught exception on" (.getName thread)))))
   (db/init)
   (set! (. Stripe -apiKey) (profile/get-secret :stripe :secret-key))
   (fut-bg (chime-core/chime-at (reminder-period) handle-reminder))
