@@ -5,8 +5,7 @@ import { BrowserRouter as Router, Switch, Route, Link } from "react-router-dom";
 import * as firebase from "firebase/app";
 import { loadStripe } from "@stripe/stripe-js";
 import marked from "marked";
-import { Button, Radio } from "antd";
-import { useHistory } from "react-router-dom";
+import { Button } from "antd";
 import howWasYourDayImg from "./images/step-how-was-your-day.png";
 import summaryImg from "./images/step-summary.png";
 
@@ -684,23 +683,6 @@ function HomeComp({ history }) {
           </div>
         </div>
       </div>
-      <div className="Home-action-container">
-        <div className="Home-action-header">
-          <h2 className="Home-action-title">Yes, it is that easy</h2>
-        </div>
-        <p className="Home-action-sub">
-          That's right. It's as simple as that. Ready to give it a whirl?
-        </p>
-        <Button
-          className="Home-btn"
-          type="primary"
-          onClick={() => {
-            history.push("/me");
-          }}
-        >
-          Sign up free
-        </Button>
-      </div>
       <div className="Home-faq-container">
         <div className="Home-faq-header">
           <h2 className="Home-faq-title">Frequently Asked Questions</h2>
@@ -720,11 +702,20 @@ function HomeComp({ history }) {
             Absolutely. If you choose to invite friends, you'll all receive a summary email. If you'd like to use this as a personal journal, you are free to do that. If you don't create any groups, you'll still be able to log and view your journals.
           </p>
         </div>
+        <div className="Home-faq-section">
+          <h3>Q: What will you do with my data?</h3>
+          <p>
+            These are your journal entries. We respect the heck out of that. I won't use or sell your data. If you report a bug, I may have to go through it. Whenever I do, I'll let you know. I'll put my <a href="https://www.linkedin.com/in/stepan-parunashvili-65698932/" target="_blank">name</a> behind that.
+          </p>
+        </div>
       </div>
       <div className="Home-action-container">
         <div className="Home-action-header">
-          <h2 className="Home-action-title">Ready to try?</h2>
+          <h2 className="Home-action-title">Yes, it is that easy</h2>
         </div>
+        <p className="Home-action-sub">
+          That's right. It's as simple as that. Ready to give it a whirl?
+        </p>
         <Button
           className="Home-btn"
           type="primary"
