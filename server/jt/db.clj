@@ -11,7 +11,7 @@
            (com.google.firebase.auth
              FirebaseAuth UserRecord$CreateRequest FirebaseAuthException)
            (com.stripe.model Customer)
-           (java.time LocalDate ZonedDateTime ZoneId)
+           (java.time ZonedDateTime)
            (java.time.format DateTimeFormatter)))
 
 (defprotocol ConvertibleToClojure
@@ -80,6 +80,13 @@
   (let [cus (Customer/create {"email" email})]
     (save-payment-info uid {:customer-id (.getId cus)})))
 
+(defn delete-payment-info [uid]
+  (when-let [cus (some-> (get-payment-info uid)
+                         :customer-id
+                         Customer/retrieve)]
+    (.delete cus))
+  (save-payment-info uid nil))
+
 ;; ------------------------------------------------------------------------------
 ;; users
 
@@ -145,6 +152,10 @@
                  get-user-by-uid)]
     user))
 
+(defn delete-user [uid]
+  (-> (FirebaseAuth/getInstance)
+      (.deleteUser uid)))
+
 (defn save-user-level [uid level]
   (firebase-save
     (firebase-ref (str "/users/" uid "/level/"))
@@ -161,19 +172,36 @@
 (defn get-group-by-id [id]
   (firebase-fetch (firebase-ref (str group-root id))))
 
-(defn add-user-to-group [group-id {:keys [uid email]}]
-  (let [add-user-to-group-fut (firebase-save
-                                (firebase-ref (str "/groups/" group-id "/users/" uid "/email"))
-                                email)
-        add-group-to-user-fut (firebase-save
-                                (firebase-ref (str "/users/" uid "/groups/" group-id))
-                                true)]
-    @add-user-to-group-fut
-    @add-group-to-user-fut))
+(defn add-user-to-group [{:keys [uid email]} group-id]
+  (firebase-save
+    (firebase-ref (str "/groups/" group-id "/users/" uid "/email"))
+    email)
+  (firebase-save
+    (firebase-ref (str "/users/" uid "/groups/" group-id))
+    true))
 
 (defn user-belongs-to-group? [group user]
   (let [uid-kw (-> user :uid keyword)]
     (-> group :users uid-kw boolean)))
+
+(defn get-user-groups [uid]
+  (let [group-kws (-> (firebase-ref (str "/users/" uid "/groups/"))
+                      firebase-fetch
+                      keys)]
+    (map name group-kws)))
+
+(defn remove-user-from-group [uid group-id]
+  (firebase-save
+    (firebase-ref (str "/groups/" group-id "/users/" uid))
+    nil)
+  (firebase-save
+    (firebase-ref (str "/users/" uid "/groups/" group-id))
+    nil))
+
+(defn delete-group-memberships [uid]
+  (let [group-ids (get-user-groups uid)]
+    (doall
+      (pmap (partial remove-user-from-group uid) group-ids))))
 
 ;; ------------------------------------------------------------------------------
 ;; invitations
@@ -221,7 +249,7 @@
       .toEpochMilli))
 
 (def entry-keys #{:sender :subject :stripped-text :stripped-html
-                    :recipient :body-html :body-plain :date})
+                  :recipient :body-html :body-plain :date})
 
 (def entry-date-formatter
   (-> "EEE, d LLL yyyy HH:mm:ss ZZ"
@@ -245,6 +273,11 @@
     (->> entries
          (sort-by first)
          (map (comp ->entry second)))))
+
+(defn delete-entries [uid]
+  (firebase-save
+    (firebase-ref (str "/entries/" uid "/"))
+    nil))
 
 ;; ------------------------------------------------------------------------------
 ;; init

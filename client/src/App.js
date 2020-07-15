@@ -295,15 +295,19 @@ class Journals extends React.Component {
     firebase
       .database()
       .ref(`/entries/${firebase.auth().currentUser.uid}/`)
-      .on("value", (snap) => {
-        this.setState({
-          journals: snap.val(),
-          isLoadingJournals: false,
-        });
-      }, err => {
-        console.log(`/entries/${firebase.auth().currentUser.uid}/`);
-        this.setState({errorMessage: "oi can't access journals"});
-      });
+      .on(
+        "value",
+        (snap) => {
+          this.setState({
+            journals: snap.val(),
+            isLoadingJournals: false,
+          });
+        },
+        (err) => {
+          console.log(`/entries/${firebase.auth().currentUser.uid}/`);
+          this.setState({ errorMessage: "oi can't access journals" });
+        }
+      );
   }
 
   render() {
@@ -337,11 +341,7 @@ class Journals extends React.Component {
                   onClick={(e) => {
                     firebase
                       .database()
-                      .ref(
-                        `/entries/${firebase.auth().currentUser.uid}/${
-                          k
-                        }`
-                      )
+                      .ref(`/entries/${firebase.auth().currentUser.uid}/${k}`)
                       .set(null);
                   }}
                 >
@@ -401,6 +401,34 @@ class Account extends React.Component {
     if (isLoading) {
       return <div>Loading...</div>;
     }
+    const deleteAcc = (
+      <h3>
+        Wanna delete your account instead?
+        <button
+          onClick={(e) => {
+            firebase
+              .auth()
+              .currentUser.getIdToken()
+              .then((token) => {
+                return fetch(serverPath("api/me/delete-account"), {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    token: token,
+                  },
+                });
+              })
+              .then((x) => {
+                firebase.auth().signOut();
+                alert('oky doke you are deleted');
+                return x.status === 200 ? x.json() : Promise.reject(x.json());
+              });
+          }}
+        >
+          Delete Account
+        </button>
+      </h3>
+    );
     if (level === "premium") {
       return (
         <div>
@@ -440,10 +468,13 @@ class Account extends React.Component {
           >
             downgrade
           </button>
+          <br />
+          {deleteAcc}
         </div>
       );
     }
     return (
+      <div>
       <h1>
         Hey, want to upgrade?{" "}
         <button
@@ -480,6 +511,8 @@ class Account extends React.Component {
           Click here to upgrade to premium
         </button>
       </h1>
+      {deleteAcc}
+      </div>
     );
   }
 }

@@ -348,7 +348,7 @@
             (format "Expected sender-user = %s to belong to group = %s"
                     sender-user group))]
     (db/delete-invitation id)
-    (db/add-user-to-group group-id receiver-user)))
+    (db/add-user-to-group receiver-user group-id)))
 
 (defn magic-auth-handler [{:keys [body] :as _req}]
   (let [{:keys [code]} body
@@ -376,6 +376,18 @@
            (content-group-invitation sender-email receiver-email)
            send-email)
       (response {:sent true}))))
+
+;; ------------------------------------------------------------------------------
+;; account
+
+(defn delete-account-handler [{:keys [headers] :as _req}]
+  (let [{:keys [uid] :as _user} (db/get-user-from-id-token (get headers "token"))]
+    (do
+      (db/delete-group-memberships uid)
+      (db/delete-payment-info uid)
+      (db/delete-entries uid)
+      (db/delete-user uid))
+    (response {:receive true})))
 
 ;; ------------------------------------------------------------------------------
 ;; stripe
@@ -463,6 +475,7 @@
     (POST "/magic/auth" [] magic-auth-handler)
 
     (POST "/me/invite-user" [] invite-user-handler)
+    (POST "/me/delete-account" [] delete-account-handler)
     (POST "/me/checkout/create-session" [] create-session-handler)
     (POST "/me/checkout/cancel-subscription" [] cancel-subscription-handler)))
 
