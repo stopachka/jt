@@ -5,7 +5,8 @@ import { BrowserRouter as Router, Switch, Route, Link } from "react-router-dom";
 import * as firebase from "firebase/app";
 import { loadStripe } from "@stripe/stripe-js";
 import marked from "marked";
-import { Button } from "antd";
+import { Input, Button, Spin } from "antd";
+import { LoadingOutlined } from "@ant-design/icons";
 import howWasYourDayImg from "./images/step-how-was-your-day.png";
 import summaryImg from "./images/step-summary.png";
 
@@ -34,6 +35,19 @@ function serverPath(path) {
   const root =
     process.env.NODE_ENV === "development" ? "http://localhost:8080" : "";
   return `${root}/${path}`;
+}
+
+function FullScreenSpin({message}) {
+  return (
+    <div className="Full-Screen-Loading-container">
+      <div className="Full-Screen-Loading">
+        <Spin 
+          tip={message}
+          indicator={<LoadingOutlined style={{ fontSize: 24 }} spin />}
+         />
+      </div>
+    </div>
+  );
 }
 
 class SignIn extends React.Component {
@@ -77,14 +91,15 @@ class SignIn extends React.Component {
               });
           }}
         >
-          <input
+          <Input
             type="email"
             placeholder="Enter your email"
+            size="large"
             ref={(ref) => {
               this._emailInput = ref;
             }}
           />
-          <button type="submit">Send me a magic code!</button>
+          <Button size="large" type="submit">Send me a magic code!</Button>
         </form>
       </div>
     );
@@ -546,7 +561,7 @@ class MeComp extends React.Component {
   render() {
     const { isLoading, isLoggedIn } = this.state;
     if (isLoading) {
-      return <div>Loading...</div>;
+      return <FullScreenSpin />;
     }
     if (!isLoggedIn) {
       return <SignIn />;
@@ -690,22 +705,37 @@ function HomeComp({ history }) {
         <div className="Home-faq-section">
           <h3>Q: How much does this cost?</h3>
           <p>
-            You are free to use Journal Together as long as you like. <strong>There is a
-            premium membership that costs $10 a month</strong>. If you choose the premium membership,
-            you'll have access to your journals since the beginning of time. A
-            standard membership on shows the last one month's worth.
+            You are free to use Journal Together as long as you like.{" "}
+            <strong>
+              There is a premium membership that costs $10 a month
+            </strong>
+            . If you choose the premium membership, you'll have access to your
+            journals since the beginning of time. A standard membership on shows
+            the last one month's worth.
           </p>
         </div>
         <div className="Home-faq-section">
           <h3>Q: Can I just use this for myself?</h3>
           <p>
-            Absolutely. If you choose to invite friends, you'll all receive a summary email. If you'd like to use this as a personal journal, you are free to do that. If you don't create any groups, you'll still be able to log and view your journals.
+            Absolutely. If you choose to invite friends, you'll all receive a
+            summary email. If you'd like to use this as a personal journal, you
+            are free to do that. If you don't create any groups, you'll still be
+            able to log and view your journals.
           </p>
         </div>
         <div className="Home-faq-section">
           <h3>Q: What will you do with my data?</h3>
           <p>
-            These are your journal entries. We respect the heck out of that. I won't use or sell your data. If you report a bug, I may have to go through it. Whenever I do, I'll let you know. I'll put my <a href="https://www.linkedin.com/in/stepan-parunashvili-65698932/" target="_blank">name</a> behind that.
+            These are your journal entries. We respect the heck out of that. I
+            won't use or sell your data. If you report a bug, I may have to go
+            through it. Whenever I do, I'll let you know. I'll put my{" "}
+            <a
+              href="https://www.linkedin.com/in/stepan-parunashvili-65698932/"
+              target="_blank"
+            >
+              name
+            </a>{" "}
+            behind that.
           </p>
         </div>
       </div>
