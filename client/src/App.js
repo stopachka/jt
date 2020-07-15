@@ -5,6 +5,10 @@ import { BrowserRouter as Router, Switch, Route, Link } from "react-router-dom";
 import * as firebase from "firebase/app";
 import { loadStripe } from "@stripe/stripe-js";
 import marked from "marked";
+import { Button, Radio } from "antd";
+import { useHistory } from "react-router-dom";
+import howWasYourDayImg from "./images/step-how-was-your-day.png";
+import summaryImg from "./images/step-summary.png";
 
 // Set up Firebase
 import "firebase/auth";
@@ -420,7 +424,7 @@ class Account extends React.Component {
               })
               .then((x) => {
                 firebase.auth().signOut();
-                alert('oky doke you are deleted');
+                alert("oky doke you are deleted");
                 return x.status === 200 ? x.json() : Promise.reject(x.json());
               });
           }}
@@ -475,43 +479,43 @@ class Account extends React.Component {
     }
     return (
       <div>
-      <h1>
-        Hey, want to upgrade?{" "}
-        <button
-          onClick={() => {
-            this.setState({ isLoading: true });
-            const sessionPromise = firebase
-              .auth()
-              .currentUser.getIdToken()
-              .then((token) => {
-                return fetch(serverPath("api/me/checkout/create-session"), {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    token: token,
-                  },
+        <h1>
+          Hey, want to upgrade?{" "}
+          <button
+            onClick={() => {
+              this.setState({ isLoading: true });
+              const sessionPromise = firebase
+                .auth()
+                .currentUser.getIdToken()
+                .then((token) => {
+                  return fetch(serverPath("api/me/checkout/create-session"), {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      token: token,
+                    },
+                  });
+                })
+                .then((x) => {
+                  return x.status === 200 ? x.json() : Promise.reject(x.json());
                 });
-              })
-              .then((x) => {
-                return x.status === 200 ? x.json() : Promise.reject(x.json());
-              });
-            Promise.all([stripePromise, sessionPromise]).then(
-              ([stripe, session]) => {
-                stripe.redirectToCheckout({ sessionId: session["id"] });
-              },
-              (e) => {
-                this.setState({
-                  isLoading: false,
-                  errorMessage: "Oh boy. can't upgrade ya.",
-                });
-              }
-            );
-          }}
-        >
-          Click here to upgrade to premium
-        </button>
-      </h1>
-      {deleteAcc}
+              Promise.all([stripePromise, sessionPromise]).then(
+                ([stripe, session]) => {
+                  stripe.redirectToCheckout({ sessionId: session["id"] });
+                },
+                (e) => {
+                  this.setState({
+                    isLoading: false,
+                    errorMessage: "Oh boy. can't upgrade ya.",
+                  });
+                }
+              );
+            }}
+          >
+            Click here to upgrade to premium
+          </button>
+        </h1>
+        {deleteAcc}
       </div>
     );
   }
@@ -619,35 +623,123 @@ class MagicAuthComp extends React.Component {
 
 const MagicAuth = withRouter(MagicAuthComp);
 
-function Home() {
+function HomeComp({ history }) {
   return (
     <div className="Home">
-      <h1>journaltogether</h1>
-      <h3>Keep track of your days and connect with your friends</h3>
-      <ol>
-        <li>Choose a few friends</li>
-        <li>
-          Every evening, each of you will receive an email, asking about your
-          day
-        </li>
-        <li>Each of you write a reflection</li>
-        <li>
-          The next morning, you'll all receive an email of all reflections
-        </li>
-      </ol>
-      <h4>
-        Interested?{" "}
-        <a
-          href="mailto:stepan.p@gmail.com"
-          rel="noopener noreferrer"
-          target="_blank"
+      <div className="Home-menu">
+        <div className="Home-menu-items">
+          <Link to="/me">Sign in</Link>
+        </div>
+      </div>
+      <div className="Home-hero">
+        <div className="Home-hero-header">
+          <h1 className="Home-hero-title">📝 journaltogether</h1>
+          <h2 className="Home-hero-sub">
+            Keep track of your days and connect with your friends
+          </h2>
+        </div>
+        <div className="Home-hero-content">
+          <p>
+            Journal and keep tabs with your friends all over email. At the end
+            of every day, you'll receive an email from Journal Together. The
+            very next day, you'll receive a group email with your friends, with
+            what everyone wrote. It's as simple as that
+          </p>
+        </div>
+      </div>
+      <div className="Home-steps-container">
+        <div className="Home-step">
+          <div className="Home-step-image-container"></div>
+          <div className="Home-step-info">
+            <h3 className="Home-step-title">Choose your friends</h3>
+            <p>
+              Who do you want to share a slice of life with? Sign up and pick
+              your friends
+            </p>
+          </div>
+        </div>
+        <div className="Home-step">
+          <div className="Home-step-image-container">
+            <img className="Home-step-image" src={howWasYourDayImg} />
+          </div>
+          <div className="Home-step-info">
+            <h3 className="Home-step-title">Journal over email</h3>
+            <p>
+              How did your day go? Journal Together will email you at the end of
+              every day. Jot it down in any way you like.
+            </p>
+          </div>
+        </div>
+        <div className="Home-step">
+          <div className="Home-step-image-container">
+            <img className="Home-step-image" src={summaryImg} />
+          </div>
+          <div className="Home-step-info">
+            <h3 className="Home-step-title">See how your friends are doing</h3>
+            <p>
+              At the beginning of the next day, you'll receive a group email
+              with what all your friends wrote. Experience eachother's slice of
+              life no matter where in the world you are.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="Home-action-container">
+        <div className="Home-action-header">
+          <h2 className="Home-action-title">Yes, it is that easy</h2>
+        </div>
+        <p className="Home-action-sub">
+          That's right. It's as simple as that. Ready to give it a whirl?
+        </p>
+        <Button
+          className="Home-btn"
+          type="primary"
+          onClick={() => {
+            history.push("/me");
+          }}
         >
-          send a ping : )
-        </a>
-      </h4>
+          Sign up free
+        </Button>
+      </div>
+      <div className="Home-faq-container">
+        <div className="Home-faq-header">
+          <h2 className="Home-faq-title">Frequently Asked Questions</h2>
+        </div>
+        <div className="Home-faq-section">
+          <h3>Q: How much does this cost?</h3>
+          <p>
+            You are free to use Journal Together as long as you like. <strong>There is a
+            premium membership that costs $10 a month</strong>. If you choose the premium membership,
+            you'll have access to your journals since the beginning of time. A
+            standard membership on shows the last one month's worth.
+          </p>
+        </div>
+        <div className="Home-faq-section">
+          <h3>Q: Can I just use this for myself?</h3>
+          <p>
+            Absolutely. If you choose to invite friends, you'll all receive a summary email. If you'd like to use this as a personal journal, you are free to do that. If you don't create any groups, you'll still be able to log and view your journals.
+          </p>
+        </div>
+      </div>
+      <div className="Home-action-container">
+        <div className="Home-action-header">
+          <h2 className="Home-action-title">Ready to try?</h2>
+        </div>
+        <Button
+          className="Home-btn"
+          type="primary"
+          onClick={() => {
+            history.push("/me");
+          }}
+        >
+          Sign up free
+        </Button>
+      </div>
     </div>
   );
 }
+
+const Home = withRouter(HomeComp);
 
 class App extends React.Component {
   render() {

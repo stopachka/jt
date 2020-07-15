@@ -1,4 +1,98 @@
 .App {
-  padding: 1em 2em;
-  line-height: 1.6;
+  max-width: 1100px;
+  padding: 0 1em;
+  margin: 0 auto;
+}
+
+.Home { 
+  font-size: medium;
+}
+
+.Home-menu { 
+  padding: 1em;
+  font-weight: 500;
+  display: flex;
+  text-align: right;
+  flex-direction: column;
+}
+
+.Home-hero { 
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 1em;
+}
+
+.Home-hero-header {
+  font-size: large;
+}
+
+.Home-hero-title {
+  font-weight: bolder;
+}
+
+.Home-hero-sub { 
+  max-width: 500px;
+}
+
+.Home-hero-content { 
+  max-width: 500px;
+}
+
+.Home-steps-container {
+  display: flex;
+  flex-direction: column;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.Home-step { 
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 0.5em;
+}
+
+.Home-step-image-container {
+  width: 50%;
+  padding: 0 2em;
+}
+
+.Home-step-image { 
+  width: 100%;
+}
+
+.Home-step-info { 
+  flex: 1;
+}
+
+.Home-action-container {
+  max-width: 500px;
+  margin: 0 auto;
+  text-align: center;
+  margin-bottom: 1em;
+}
+
+.Home-action-header {
+  font-size: large;
+}
+
+.Home-faq-container {
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.Home-faq-header {
+  font-size: large;
+}
+
+.Home-faq-title {
+  text-align: center;
+}
+
+.Home-btn { 
+  font-size: large;
+  padding: 0.5em 1em;
+  height: auto;
+  font-weight: 500;
 }
