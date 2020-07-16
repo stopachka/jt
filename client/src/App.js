@@ -649,23 +649,18 @@ class MagicAuthComp extends React.Component {
           this.props.history.push("/me");
         },
         () => {
-          this.setState({
-            isLoading: false,
-            errorMessage: "Uh oh. failed to log in please ping Stopa",
-          });
+          this.props.history.push("/me");
+          message.error('This magic link did not seem to work. Please try again')
         }
       );
   }
 
   render() {
     const { isLoading, errorMessage } = this.state;
-    if (errorMessage) {
-      return <div>{errorMessage}</div>;
-    }
     if (isLoading) {
-      return <div>Loading...</div>;
+      return <FullScreenSpin message="Signing in..." />
     }
-    return <div>Magic Link worked!</div>;
+    return null;
   }
 }
 
