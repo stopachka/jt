@@ -172,7 +172,7 @@ button {
   align-items: center;
   justify-content: space-between;
   font-size: medium;
-  margin: 1em 0;
+  padding: 1em 0 2em;
 }
 
 .Me-header-logo {
@@ -240,6 +240,23 @@ button {
 .Journal-upsell-btn {
   font-size: medium;
   padding: 0.5em 2em;
+  height: auto;
+  font-weight: 500;
+}
+
+.Account-container { 
+  font-size: medium;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.Account-membership-container {
+  margin-bottom: 2em;
+}
+
+.Account-upgrade-btn {
+  font-size: medium;
+  padding: 0.5em 1em;
   height: auto;
   font-weight: 500;
 }

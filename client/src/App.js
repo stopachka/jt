@@ -12,7 +12,7 @@ import * as firebase from "firebase/app";
 import { loadStripe } from "@stripe/stripe-js";
 import marked from "marked";
 import { Form, Input, Button, Spin, Modal, message } from "antd";
-import { LoadingOutlined, ExclamationCircleOutlined} from "@ant-design/icons";
+import { LoadingOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
 import howWasYourDayImg from "./images/step-how-was-your-day.png";
 import summaryImg from "./images/step-summary.png";
 
@@ -346,11 +346,13 @@ class JournalsComp extends React.Component {
     firebase
       .database()
       .ref(`/users/${firebase.auth().currentUser.uid}/level`)
-      .on("value", (snap) =>
-        this.setState({ isLoadingLevel: false, level: snap.val() })
-      , (err) => {
-        message.error('Uh oh, we could not access your journals.');
-      });
+      .on(
+        "value",
+        (snap) => this.setState({ isLoadingLevel: false, level: snap.val() }),
+        (err) => {
+          message.error("Uh oh, we could not access your journals.");
+        }
+      );
     firebase
       .database()
       .ref(`/entries/${firebase.auth().currentUser.uid}/`)
@@ -363,7 +365,7 @@ class JournalsComp extends React.Component {
           });
         },
         (err) => {
-          message.error('Uh oh, we could not access your journals.');
+          message.error("Uh oh, we could not access your journals.");
         }
       );
   }
@@ -377,15 +379,21 @@ class JournalsComp extends React.Component {
       level,
     } = this.state;
     if (isLoadingJournals) {
-      return <FullScreenSpin />
+      return <FullScreenSpin />;
     }
     const journalEntries = Object.entries(journals || {});
     if (journalEntries.length === 0) {
       return (
         <div className="Empty-journals-container">
           <div className="Empty-journals">
-            <h2 className="Empty-journals-title">You don't have any journals yet</h2>
-            <p className="Empty-journals-desc">Journal Buddy should send you an email asking about your day soon. Once you answer, those entries will show up here. Check back soon! 😊</p>
+            <h2 className="Empty-journals-title">
+              You don't have any journals yet
+            </h2>
+            <p className="Empty-journals-desc">
+              Journal Buddy should send you an email asking about your day soon.
+              Once you answer, those entries will show up here. Check back soon!
+              😊
+            </p>
           </div>
         </div>
       );
@@ -413,18 +421,23 @@ class JournalsComp extends React.Component {
                       Modal.confirm({
                         icon: <ExclamationCircleOutlined />,
                         title: "Are you absolutely sure?",
-                        content: <p>
-                          You're about to delete your journal entry. This can't be undone.
-                        </p>,
-                        okText: 'Yes, delete this entry',
-                        okType: 'danger',
-                        onOk() { 
+                        content: (
+                          <p>
+                            You're about to delete your journal entry. This
+                            can't be undone.
+                          </p>
+                        ),
+                        okText: "Yes, delete this entry",
+                        okType: "danger",
+                        onOk() {
                           return firebase
-                          .database()
-                          .ref(`/entries/${firebase.auth().currentUser.uid}/${k}`)
-                          .set(null);
-                        }
-                      })
+                            .database()
+                            .ref(
+                              `/entries/${firebase.auth().currentUser.uid}/${k}`
+                            )
+                            .set(null);
+                        },
+                      });
                     }}
                   >
                     Delete this entry
@@ -446,15 +459,17 @@ class JournalsComp extends React.Component {
               Want to access all your journals for life?
             </h1>
             <p className="Journal-upsell-content">
-              Right now you only have access to entries in the past month. Upgrade to access all your journals for life.
+              Right now you only have access to entries in the past month.
+              Upgrade to access all your journals for life.
             </p>
-            <Button 
+            <Button
               className="Journal-upsell-btn"
               type="primary"
-              onClick={e => {
-                this.props.history.push('/me/account');
-              }}>
-                Learn more
+              onClick={(e) => {
+                this.props.history.push("/me/account");
+              }}
+            >
+              Learn more
             </Button>
           </div>
         ) : null}
@@ -470,6 +485,7 @@ class Account extends React.Component {
     super(props);
     this.state = {
       isLoading: true,
+      isUpgrading: false,
       level: null,
     };
   }
@@ -477,18 +493,208 @@ class Account extends React.Component {
     firebase
       .database()
       .ref(`/users/${firebase.auth().currentUser.uid}/level`)
-      .on("value", (snap) =>
-        this.setState({ isLoading: false, level: snap.val() })
+      .on(
+        "value",
+        (snap) => this.setState({ isLoading: false, level: snap.val() }),
+        (err) => {
+          message.error(
+            "Uh no, failed to fetch your data. Sorry about that :("
+          );
+        }
       );
   }
   render() {
-    const { isLoading, errorMessage, level } = this.state;
-    if (errorMessage) {
-      return <div>{errorMessage}</div>;
-    }
+    const { isLoading, isUpgrading, level } = this.state;
     if (isLoading) {
-      return <div>Loading...</div>;
+      return <FullScreenSpin />;
     }
+    return (
+      <div className="Account-container">
+        <div className="Account-membership-container">
+          <h2 className="Account-membershup-title">
+            Membership:{" "}
+            {level === "premium" ? (
+              <span className="Account-membershup-title-premium">
+                🏅Premium
+              </span>
+            ) : (
+              <span className="Account-membershup-title-standard">
+                Standard
+              </span>
+            )}
+          </h2>
+          <div className="Account-membership-content-container">
+            {level === "premium" ? (
+              <div className="Account-membership-content">
+                <p className="Account-memberip-content">
+                  Thank you for supporting us. I appreciate your patronage 😊
+                </p>
+                <p className="Account-memberip-content">
+                  If time has comes to move on from Journal Together though, I
+                  completely understand. If you'd like to cancel your
+                  subscription, here's a handy button to do that
+                </p>
+                <Button
+                  size="large"
+                  type="danger"
+                  onClick={(e) => {
+                    Modal.confirm({
+                      icon: <ExclamationCircleOutlined />,
+                      title: "Are you absolutely sure?",
+                      content: (
+                        <p>
+                          You're about to cancel your subscription. Changes will
+                          take place immediately
+                        </p>
+                      ),
+                      okText: "Yes, cancel my subscription",
+                      okType: "danger",
+                      onOk() {
+                        firebase
+                          .auth()
+                          .currentUser.getIdToken()
+                          .then((token) => {
+                            return fetch(
+                              serverPath("api/me/checkout/cancel-subscription"),
+                              {
+                                method: "POST",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                  token: token,
+                                },
+                              }
+                            );
+                          })
+                          .then((x) => {
+                            return x.status === 200
+                              ? x.json()
+                              : Promise.reject(x.json());
+                          })
+                          .catch((e) => {
+                            message.error(
+                              "Oh no, something broke. We'll be on this as fast as possible. Please try again"
+                            );
+                          });
+                      },
+                    });
+                  }}
+                >
+                  Cancel my subscription
+                </Button>
+              </div>
+            ) : (
+              <div className="Account-membershop-content-container">
+                <div className="Account-membership-content">
+                  <p className="Account-memberip-content">
+                    Thank you for using Journal Together. How has your
+                    experience been? If you've liked it, want to support the
+                    product, and gain access to journals for life, consider
+                    upgrading to 🏅Premium. No matter what we are happy you are
+                    our customer 😊
+                  </p>
+                </div>
+                <Button
+                  className="Account-upgrade-btn"
+                  type="primary"
+                  loading={isUpgrading}
+                  onClick={() => {
+                    this.setState({ isUpgrading: true });
+                    const sessionPromise = firebase
+                      .auth()
+                      .currentUser.getIdToken()
+                      .then((token) => {
+                        return fetch(
+                          serverPath("api/me/checkout/create-session"),
+                          {
+                            method: "POST",
+                            headers: {
+                              "Content-Type": "application/json",
+                              token: token,
+                            },
+                          }
+                        );
+                      })
+                      .then((x) => {
+                        return x.status === 200
+                          ? x.json()
+                          : Promise.reject(x.json());
+                      });
+                    Promise.all([stripePromise, sessionPromise]).then(
+                      ([stripe, session]) => {
+                        this.setState({ isUpgrading: false });
+                        stripe.redirectToCheckout({
+                          sessionId: session["id"],
+                        });
+                      },
+                      (e) => {
+                        message.error(
+                          "Uh oh, I couldn't upgrade you. Sorry about this, we'll get on it asap"
+                        );
+                        this.setState({
+                          isUpgrading: false,
+                        });
+                      }
+                    );
+                  }}
+                >
+                  Upgrade to 🏅Premium
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="Account-delete-container">
+          <h2 className="Account-delete-title">Delete your account</h2>
+          <p className="Account-delete-content">
+            If time has come to delete your account, I understand. Thank you for
+            giving us a shot.
+          </p>
+          <Button
+            size="large"
+            type="danger"
+            onClick={(e) => {
+              Modal.confirm({
+                icon: <ExclamationCircleOutlined />,
+                title: "Are you absolutely sure?",
+                content: (
+                  <p>
+                    You're about to delete your account. This will purge all
+                    your data, and cannot be undone.
+                  </p>
+                ),
+                okText: "Yes, delete my account",
+                okType: "danger",
+                onOk() {
+                  return firebase
+                    .auth()
+                    .currentUser.getIdToken()
+                    .then((token) => {
+                      return fetch(serverPath("api/me/delete-account"), {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                          token: token,
+                        },
+                      });
+                    })
+                    .then((x) => {
+                      firebase.auth().signOut();
+                      message.info(
+                        "Your account has been deleted. Thank you for giving us a shot"
+                      );
+                      return x.status === 200
+                        ? x.json()
+                        : Promise.reject(x.json());
+                    });
+                },
+              });
+            }}
+          >
+            Delete my account
+          </Button>
+        </div>
+      </div>
+    );
     const deleteAcc = (
       <h3>
         Wanna delete your account instead?
@@ -556,8 +762,6 @@ class Account extends React.Component {
           >
             downgrade
           </button>
-          <br />
-          {deleteAcc}
         </div>
       );
     }
