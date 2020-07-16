@@ -11,8 +11,8 @@ import {
 import * as firebase from "firebase/app";
 import { loadStripe } from "@stripe/stripe-js";
 import marked from "marked";
-import { Form, Input, Button, Spin, message } from "antd";
-import { LoadingOutlined } from "@ant-design/icons";
+import { Form, Input, Button, Spin, Modal, message } from "antd";
+import { LoadingOutlined, ExclamationCircleOutlined} from "@ant-design/icons";
 import howWasYourDayImg from "./images/step-how-was-your-day.png";
 import summaryImg from "./images/step-summary.png";
 
@@ -332,7 +332,7 @@ class ProfileHome extends React.Component {
   }
 }
 
-class Journals extends React.Component {
+class JournalsComp extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
@@ -372,7 +372,7 @@ class Journals extends React.Component {
     const {
       isLoadingJournals,
       isLoadingLevel,
-      errorMessage,
+
       journals,
       level,
     } = this.state;
@@ -410,10 +410,21 @@ class Journals extends React.Component {
                     className="Journal-entry-header-btn"
                     type="default"
                     onClick={(e) => {
-                      firebase
-                        .database()
-                        .ref(`/entries/${firebase.auth().currentUser.uid}/${k}`)
-                        .set(null);
+                      Modal.confirm({
+                        icon: <ExclamationCircleOutlined />,
+                        title: "Are you absolutely sure?",
+                        content: <p>
+                          You're about to delete your journal entry. This can't be undone.
+                        </p>,
+                        okText: 'Yes, delete this entry',
+                        okType: 'danger',
+                        onOk() { 
+                          return firebase
+                          .database()
+                          .ref(`/entries/${firebase.auth().currentUser.uid}/${k}`)
+                          .set(null);
+                        }
+                      })
                     }}
                   >
                     Delete this entry
@@ -440,7 +451,9 @@ class Journals extends React.Component {
             <Button 
               className="Journal-upsell-btn"
               type="primary"
-              to="/me/account">
+              onClick={e => {
+                this.props.history.push('/me/account');
+              }}>
                 Learn more
             </Button>
           </div>
@@ -449,6 +462,8 @@ class Journals extends React.Component {
     );
   }
 }
+
+const Journals = withRouter(JournalsComp);
 
 class Account extends React.Component {
   constructor(props) {

@@ -171,7 +171,10 @@
   {:from hows-your-day-email-with-name
    :to to
    :subject subject
-   :html "Oky doke, received this 👌"})
+   :html (str
+           "<p>Oky doke, I logged this entry!</p>"
+           "<p>To manage your journals, you can always visit https://www.journaltogether.com/me/journals</p>"
+           "<p>See ya</p>")})
 
 (defn url-with-magic-code [magic-code]
   (str "https://www.journaltogether.com/magic/" magic-code))
