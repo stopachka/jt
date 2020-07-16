@@ -929,7 +929,7 @@ class MeComp extends React.Component {
     if (isLoading) {
       return <FullScreenSpin />;
     }
-    if (!isLoggedIn) {
+    if (!isLoggedIn || !firebase.auth().currentUser) {
       return <SignIn />;
     }
     return (
