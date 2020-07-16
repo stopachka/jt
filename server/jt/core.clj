@@ -419,7 +419,7 @@
       :else
       (do (.cancel sub)
           (db/save-user-level uid :standard)))
-    (response {:receive true})))
+    (response {:success true})))
 
 (defn create-session-handler [{:keys [headers] :as _req}]
   (let [{:keys [uid] :as _user} (db/get-user-from-id-token (get headers "token"))
