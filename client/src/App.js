@@ -15,6 +15,7 @@ import { Form, Input, Button, Spin, Modal, message } from "antd";
 import { LoadingOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
 import howWasYourDayImg from "./images/step-how-was-your-day.png";
 import summaryImg from "./images/step-summary.png";
+import qs from "qs";
 
 // Set up Firebase
 import "firebase/auth";
@@ -480,7 +481,7 @@ class JournalsComp extends React.Component {
 
 const Journals = withRouter(JournalsComp);
 
-class Account extends React.Component {
+class AccountComp extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
@@ -536,7 +537,7 @@ class Account extends React.Component {
                 </p>
                 <Button
                   size="large"
-                  type="danger"
+                  type="default"
                   onClick={(e) => {
                     Modal.confirm({
                       icon: <ExclamationCircleOutlined />,
@@ -651,7 +652,7 @@ class Account extends React.Component {
           </p>
           <Button
             size="large"
-            type="danger"
+            type="default"
             onClick={(e) => {
               Modal.confirm({
                 icon: <ExclamationCircleOutlined />,
@@ -698,9 +699,7 @@ class Account extends React.Component {
   }
 }
 
-function CheckoutSuccess() {
-  return <div>Baam you're signed up :)</div>;
-}
+const Account = withRouter(AccountComp);
 
 class MeComp extends React.Component {
   constructor(props) {
@@ -712,6 +711,14 @@ class MeComp extends React.Component {
   }
 
   componentDidMount() {
+    const queryParams = qs.parse(this.props.location.search, {
+      ignoreQueryPrefix: true,
+    });
+    if (queryParams.success) {
+      message.success(
+        "Welcome to Journal Together premium! We are happy to have you"
+      );
+    }
     window.signOut = () => firebase.auth().signOut();
     firebase.auth().onAuthStateChanged((user) => {
       this.setState({
@@ -762,9 +769,6 @@ class MeComp extends React.Component {
           </Route>
           <Route path="/me/account">
             <Account />
-          </Route>
-          <Route path="/me/checkout/success">
-            <CheckoutSuccess />
           </Route>
           <Route path="/me">
             <ProfileHome />

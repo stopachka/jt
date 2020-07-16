@@ -4,7 +4,7 @@
  :stripe
  {:premium-price-id "price_1H4IDVGnGs7xopb5ZhBQ2hnU"
   :session
-  {:success-url "http://localhost:3000/me/checkout/success?session_id={CHECKOUT_SESSION_ID}"
+  {:success-url "http://localhost:3000/me/account?success=true&session_id={CHECKOUT_SESSION_ID}"
    :cancel-url "http://localhost:3000/me/account"}}
  :firebase
  {:auth {:uid "jt-sv"}
