@@ -151,7 +151,7 @@ class ProfileHome extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      errorMessage: null,
+      isLoading: true,
       idToGroup: {},
     };
     this._idToGroupRef = {};
@@ -162,18 +162,36 @@ class ProfileHome extends React.Component {
   componentDidMount() {
     const updateGroups = (f) => {
       this.setState(({ idToGroup }) => ({
+        isLoading: false,
         idToGroup: f(idToGroup),
       }));
     };
     const onGroup = (snap) => {
       updateGroups((oldGroups) => ({ ...oldGroups, [snap.key]: snap.val() }));
     };
-    this._userGroupIdsRef.on("child_added", (snap) => {
-      const groupId = snap.key;
-      if (this._idToGroupRef[groupId]) return;
-      const newRef = firebase.database().ref(`/groups/${groupId}/`);
-      newRef.on("value", onGroup);
-      this._idToGroupRef[groupId] = newRef;
+    
+    const removeStrayGroupIds = (groupIdSet) => {
+      for (let [k, ref] of Object.entries(this._idToGroupRef)) {
+        if (groupIdSet.has(k)) { continue; }
+        ref.off();
+        delete this._idToGroupRef[k];
+      }
+    }
+    const listenToNewGroupIds = (groupIdSet) => {
+      groupIdSet.forEach(groupId => {
+        if (this._idToGroupRef[groupId]) return;
+        const newRef = firebase.database().ref(`/groups/${groupId}/`);
+        newRef.on("value", onGroup);
+        this._idToGroupRef[groupId] = newRef;  
+      })
+    }
+    this._userGroupIdsRef.on("value", (snap) => {
+      const groupIdSet = new Set(Object.keys(snap.val() || {}));
+      if (groupIdSet.size === 0) {
+        this.setState({isLoading: false})
+      }
+      removeStrayGroupIds(groupIdSet);
+      listenToNewGroupIds(groupIdSet);
     });
     this._userGroupIdsRef.on("child_removed", (snap) => {
       const groupId = snap.key;
@@ -194,9 +212,9 @@ class ProfileHome extends React.Component {
   }
 
   render() {
-    const { idToGroup, errorMessage } = this.state;
-    if (errorMessage) {
-      return errorMessage;
+    const { idToGroup, isLoading } = this.state;
+    if (isLoading) {
+      return <FullScreenSpin />
     }
     return (
       <div>
