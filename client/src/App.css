@@ -1,7 +1,17 @@
+button {
+  cursor: pointer;
+}
+
+#root { 
+  width: 100%;
+  height: 100%;
+}
+
 .App {
   max-width: 1100px;
   padding: 0 1em;
   margin: 0 auto;
+  height: 100%;
 }
 
 .Home { 
@@ -97,7 +107,6 @@
   font-weight: 500;
 }
 
-
 .Full-Screen-Loading-container {
   position: fixed;
   left: 0;
@@ -107,4 +116,48 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.Sign-in-root { 
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.Sign-in-header-and-form { 
+  max-width: 500px;
+  font-size: large;
+}
+
+.Sign-in-header { 
+  text-align: center;
+}
+
+.Sign-in-header-title {
+  font-weight: bolder; 
+}
+
+.Sign-in-form-submit-btn {
+  font-size: large;
+  font-weight: bold;
+  width: 100%;
+  height: auto;
+}
+
+.Sign-in-success-container { 
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.Sign-in-success { 
+  max-width: 500px;
+  font-size: large;
+  text-align: center;
+}
+
+.Sign-in-success-title {
+  font-weight: bolder; 
 }

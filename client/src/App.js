@@ -5,7 +5,7 @@ import { BrowserRouter as Router, Switch, Route, Link } from "react-router-dom";
 import * as firebase from "firebase/app";
 import { loadStripe } from "@stripe/stripe-js";
 import marked from "marked";
-import { Input, Button, Spin } from "antd";
+import { Form, Input, Button, Spin, message } from "antd";
 import { LoadingOutlined } from "@ant-design/icons";
 import howWasYourDayImg from "./images/step-how-was-your-day.png";
 import summaryImg from "./images/step-summary.png";
@@ -37,14 +37,14 @@ function serverPath(path) {
   return `${root}/${path}`;
 }
 
-function FullScreenSpin({message}) {
+function FullScreenSpin({ message }) {
   return (
     <div className="Full-Screen-Loading-container">
       <div className="Full-Screen-Loading">
-        <Spin 
+        <Spin
           tip={message}
           indicator={<LoadingOutlined style={{ fontSize: 24 }} spin />}
-         />
+        />
       </div>
     </div>
   );
@@ -55,52 +55,86 @@ class SignIn extends React.Component {
     super(props);
     this.state = {
       hasRequestedCode: false,
-      errorMessage: null,
     };
   }
+  componentDidMount() {
+    this._emailInput && this._emailInput.focus();
+  }
   render() {
-    const { hasRequestedCode, errorMessage } = this.state;
+    const { hasRequestedCode } = this.state;
     if (hasRequestedCode) {
       return (
-        <div>
-          <h1>Nice! Okay check your email</h1>
+        <div className="Sign-in-success-container">
+          <div className="Sign-in-success">
+            <h1 className="Sign-in-success-title">📝 journaltogether</h1>
+            <h2 className="Sign-in-success-sub">Check your mail 😊</h2>
+            <p className="Sign-in-success-content">
+              Oky doke, you should receive an email from journal-signup. Click
+              the link in there to login
+            </p>
+          </div>
         </div>
       );
     }
     return (
-      <div>
-        {errorMessage && <h3>{errorMessage}</h3>}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            const email = this._emailInput.value;
-            this.setState({ hasRequestedCode: true });
-            fetch(serverPath("api/magic/request"), {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email }),
-            })
-              .then((x) =>
-                x.status === 200 ? x.json() : Promise.reject(x.json())
-              )
-              .catch(() => {
-                this.setState({
-                  errorMessage:
-                    "Uh oh. failed to send you an email. Plz ping Stopa",
-                });
-              });
-          }}
-        >
-          <Input
-            type="email"
-            placeholder="Enter your email"
-            size="large"
-            ref={(ref) => {
-              this._emailInput = ref;
-            }}
-          />
-          <Button size="large" type="submit">Send me a magic code!</Button>
-        </form>
+      <div className="Sign-in-root">
+        <div className="Sign-in-header-and-form">
+          <div className="Sign-in-header">
+            <h1 className="Sign-in-header-title">📝 journaltogether</h1>
+            <h2 className="Sign-in-header-sub">Let's get you signed in</h2>
+            <p className="Sign-in-header-content">
+              Enter your email, and you'll receive a magic link to sign in
+            </p>
+          </div>
+          <div className="Sign-in-form">
+            <Form
+              onFinish={({ email }) => {
+                this.setState({ hasRequestedCode: true });
+                fetch(serverPath("api/magic/request"), {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ email }),
+                })
+                  .then((x) =>
+                    x.status === 200 ? x.json() : Promise.reject(x.json())
+                  )
+                  .catch(() => {
+                    message.error(
+                      "Oh no, something broke. Please try sending the magic link again"
+                    );
+                    this.setState({
+                      hasRequestedCode: false,
+                    });
+                  });
+              }}
+            >
+              <Form.Item
+                name="email"
+                rules={[{ required: true, message: "Please enter your email" }]}
+              >
+                <Input
+                  className="Sign-in-form-input"
+                  type="email"
+                  placeholder="Enter your email"
+                  size="large"
+                  ref={(ref) => {
+                    this._emailInput = ref;
+                  }}
+                />
+              </Form.Item>
+              <Form.Item>
+                <Button
+                  className="Sign-in-form-submit-btn"
+                  size="large"
+                  type="primary"
+                  htmlType="submit"
+                >
+                  Send me a magic code 🚀
+                </Button>
+              </Form.Item>
+            </Form>
+          </div>
+        </div>
       </div>
     );
   }
