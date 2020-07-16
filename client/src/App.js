@@ -431,12 +431,17 @@ class JournalsComp extends React.Component {
                         okText: "Yes, delete this entry",
                         okType: "danger",
                         onOk() {
-                          return firebase
+                          firebase
                             .database()
                             .ref(
                               `/entries/${firebase.auth().currentUser.uid}/${k}`
                             )
-                            .set(null);
+                            .set(null)
+                            .catch((e) => {
+                              message.error(
+                                "Uh oh, failed to delete your entry. Please try again"
+                              );
+                            });
                         },
                       });
                     }}

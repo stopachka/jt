@@ -395,6 +395,14 @@
     (response {:receive true})))
 
 ;; ------------------------------------------------------------------------------
+;; schedule
+
+(defn schedule-handler [_req]
+  (response
+    {:reminder-ms (db/->epoch-milli (first (reminder-period)))
+     :summary-ms (db/->epoch-milli (first (summary-email)))}))
+
+;; ------------------------------------------------------------------------------
 ;; stripe
 
 (defn cancel-subscription-handler [{:keys [headers] :as _req}]
@@ -479,6 +487,7 @@
     (POST "/magic/request" [] magic-request-handler)
     (POST "/magic/auth" [] magic-auth-handler)
 
+    (GET "/me/schedule" [] schedule-handler)
     (POST "/me/invite-user" [] invite-user-handler)
     (POST "/me/delete-account" [] delete-account-handler)
     (POST "/me/checkout/create-session" [] create-session-handler)
