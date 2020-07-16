@@ -15,6 +15,7 @@ import { Form, Input, Button, Spin, Modal, message } from "antd";
 import { LoadingOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
 import howWasYourDayImg from "./images/step-how-was-your-day.png";
 import summaryImg from "./images/step-summary.png";
+import inviteFriendsImg from "./images/step-invite-friends.png";
 import qs from "qs";
 
 // Set up Firebase
@@ -936,7 +937,7 @@ class MeComp extends React.Component {
         <div className="Me-header">
           <h2 className="Me-header-logo">
             <NavLink className="Me-header-logo-link" to="/me">
-              📝 journaltogether
+              📝 <span className="Me-header-logo-name">journaltogether</span>
             </NavLink>
           </h2>
           <div className="Me-header-menu-container">
@@ -1053,7 +1054,9 @@ function HomeComp({ history }) {
       </div>
       <div className="Home-steps-container">
         <div className="Home-step">
-          <div className="Home-step-image-container"></div>
+          <div className="Home-step-image-container">
+            <img className="Home-step-image" src={inviteFriendsImg} />
+          </div>
           <div className="Home-step-info">
             <h3 className="Home-step-title">Choose your friends</h3>
             <p>
