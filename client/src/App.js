@@ -151,8 +151,10 @@ class ProfileHome extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      isLoading: true,
+      isLoadingGroups: true,
+      isLoadingSchedule: true,
       idToGroup: {},
+      schedule: null,
     };
     this._idToGroupRef = {};
     this._userGroupIdsRef = firebase
@@ -160,35 +162,54 @@ class ProfileHome extends React.Component {
       .ref(`/users/${firebase.auth().currentUser.uid}/groups`);
   }
   componentDidMount() {
+    fetch(serverPath("api/me/schedule"), {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
+      .then((x) => {
+        return x.status === 200 ? x.json() : Promise.reject(x.json());
+      })
+      .then((schedule) => {
+        this.setState({ schedule, isLoadingSchedule: false });
+      })
+      .catch((e) => {
+        message.error(
+          "Uh oh, I wasn't able to find your schedule. May be an intermitent bug"
+        );
+      });
+    // groups
     const updateGroups = (f) => {
       this.setState(({ idToGroup }) => ({
-        isLoading: false,
+        isLoadingGroups: false,
         idToGroup: f(idToGroup),
       }));
     };
     const onGroup = (snap) => {
       updateGroups((oldGroups) => ({ ...oldGroups, [snap.key]: snap.val() }));
     };
-    
+
     const removeStrayGroupIds = (groupIdSet) => {
       for (let [k, ref] of Object.entries(this._idToGroupRef)) {
-        if (groupIdSet.has(k)) { continue; }
+        if (groupIdSet.has(k)) {
+          continue;
+        }
         ref.off();
         delete this._idToGroupRef[k];
       }
-    }
+    };
     const listenToNewGroupIds = (groupIdSet) => {
-      groupIdSet.forEach(groupId => {
+      groupIdSet.forEach((groupId) => {
         if (this._idToGroupRef[groupId]) return;
         const newRef = firebase.database().ref(`/groups/${groupId}/`);
         newRef.on("value", onGroup);
-        this._idToGroupRef[groupId] = newRef;  
-      })
-    }
+        this._idToGroupRef[groupId] = newRef;
+      });
+    };
     this._userGroupIdsRef.on("value", (snap) => {
       const groupIdSet = new Set(Object.keys(snap.val() || {}));
       if (groupIdSet.size === 0) {
-        this.setState({isLoading: false})
+        this.setState({ isLoadingGroups: false });
       }
       removeStrayGroupIds(groupIdSet);
       listenToNewGroupIds(groupIdSet);
@@ -212,14 +233,48 @@ class ProfileHome extends React.Component {
   }
 
   render() {
-    const { idToGroup, isLoading } = this.state;
-    if (isLoading) {
-      return <FullScreenSpin />
+    const {
+      idToGroup,
+      isLoadingGroups,
+      isLoadingSchedule,
+      schedule,
+    } = this.state;
+    if (isLoadingGroups || isLoadingSchedule) {
+      return <FullScreenSpin />;
     }
+    const groupEntries = Object.entries(idToGroup || {});
     return (
-      <div>
-        <h2>Groups</h2>
-        {Object.entries(idToGroup).map(([k, g]) => {
+      <div className="Profile-container">
+        {schedule && schedule["reminder-ms"] && (
+          <div className="Profile-schedule-container">
+            <h2 className="Profile-schedule-title">
+              Your next reminder:{' '}
+              <span className="Profile-schedule-reminder-date">
+                {new Date(schedule["reminder-ms"]).toLocaleString("en-US", {
+                  weekday: "long",
+                  hour: "numeric",
+                  minute: "numeric",
+                })}
+              </span>
+            </h2>
+            <p className="Profile-schedule-desc">
+              🙌 Welcome. Watch your email around {new Date(schedule["reminder-ms"]).toLocaleString("en-US", {
+                  weekday: "long",
+                  hour: "numeric",
+                  minute: "numeric",
+                })}. You'll receive an email from Journal Buddy, asking about your day. We'll record your answers as journal entries
+            </p>
+          </div>
+        )}
+        <div className="Profile-groups-container">
+          <h2 className="Profile-groups-title">Your Groups</h2>
+          {groupEntries.length === 0 ? (
+            <div className="Profile-empty-groups-container">
+              Want to journal with your friends?
+            </div>
+          ) : null}
+        </div>
+        {groupEntries.map(([k, g]) => {
           return (
             <div key={k}>
               <h4>
@@ -539,7 +594,7 @@ class AccountComp extends React.Component {
             Membership:{" "}
             {level === "premium" ? (
               <span className="Account-membershup-title-premium">
-                🏅Premium
+                🏅 Premium
               </span>
             ) : (
               <span className="Account-membershup-title-standard">
@@ -661,7 +716,7 @@ class AccountComp extends React.Component {
                     );
                   }}
                 >
-                  Upgrade to 🏅Premium
+                  Upgrade to 🏅 Premium
                 </Button>
               </div>
             )}

@@ -260,3 +260,13 @@ button {
   height: auto;
   font-weight: 500;
 }
+
+.Profile-container {
+  max-width: 700px;
+  margin: 0 auto;
+  font-size: medium;
+}
+
+.Profile-schedule-reminder-date {
+  color: blue;
+}

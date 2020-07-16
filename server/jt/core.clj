@@ -398,8 +398,8 @@
 
 (defn schedule-handler [_req]
   (response
-    {:reminder-ms (db/->epoch-milli (first (reminder-period)))
-     :summary-ms (db/->epoch-milli (first (summary-email)))}))
+    {:reminder-ms (.toEpochMilli (first (reminder-period)))
+     :summary-ms (.toEpochMilli (first (summary-period)))}))
 
 ;; ------------------------------------------------------------------------------
 ;; stripe
