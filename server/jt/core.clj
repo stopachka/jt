@@ -72,7 +72,7 @@
 
 (defn send-email [content]
   (log/infof "[mail] sending content=%s" content)
-  (when (= profile/env :prod)
+  (when (or true (= profile/env :prod))
     (mail/send-mail
       {:key (profile/get-secret :mailgun :api-key)
        :domain (profile/get-config :mailgun :domain)}
@@ -179,13 +179,15 @@
 (defn content-magic-code-response [to magic-code]
   {:from signup-email-with-name
    :to to
-   :subject "Here's how to sign into JournalTogether"
+   :subject "Magic sign-in link for Journal Together"
    :html
    (str
-     "<p>Welcome to Journal Together!</p>
-     Visit "
-     (url-with-magic-code magic-code)
-     " to get started")})
+     "<p>Hey there, you asked us to send you a magic link to sign into Journal Together.</p>"
+     "<p>Here it is:</p>"
+     "<p><strong>"(url-with-magic-code magic-code) "<strong></p>"
+     "<p>Once you open that link, you'll be signed in and ready to go!</p>"
+     "<p>Note: your magic link can only be used once.</p>"
+     "<p>See ya :)</p>")})
 
 (defn content-group-invitation [sender-email receiver-email magic-code]
   {:from signup-email-with-name

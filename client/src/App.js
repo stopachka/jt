@@ -675,8 +675,9 @@ function HomeComp({ history }) {
   return (
     <div className="Home">
       <div className="Home-menu">
-        <div className="Home-menu-items">
-          <Link to="/me">Sign in</Link>
+        <div className="Home-menu-item-container">
+          <a className="Home-menu-item" href="mailto:stepan.p@gmail.com" target="_blank">Contact us</a>
+          <Link className="Home-menu-item" to="/me">Sign in</Link>
         </div>
       </div>
       <div className="Home-hero">

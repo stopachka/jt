@@ -26,6 +26,10 @@ button {
   flex-direction: column;
 }
 
+.Home-menu-item {
+  padding: 0 0.5em;
+}
+
 .Home-hero { 
   display: flex;
   flex-direction: column;
