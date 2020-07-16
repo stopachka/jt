@@ -506,8 +506,8 @@
         (log/error e "Uncaught exception on" (.getName thread)))))
   (db/init)
   (set! (. Stripe -apiKey) (profile/get-secret :stripe :secret-key))
-  (fut-bg (chime-core/chime-at (reminder-period) handle-reminder))
-  (fut-bg (chime-core/chime-at (summary-period) handle-summary))
+  (chime-core/chime-at (reminder-period) handle-reminder)
+  (chime-core/chime-at (summary-period) handle-summary)
   (let [port (profile/get-config :port)
         app (routes
               (-> webhook-routes
