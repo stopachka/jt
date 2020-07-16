@@ -1,7 +1,13 @@
 import React from "react";
 import "./App.css";
 import { withRouter } from "react-router";
-import { BrowserRouter as Router, Switch, Route, Link } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Switch,
+  Route,
+  Link,
+  NavLink,
+} from "react-router-dom";
 import * as firebase from "firebase/app";
 import { loadStripe } from "@stripe/stripe-js";
 import marked from "marked";
@@ -587,7 +593,7 @@ class MeComp extends React.Component {
     firebase.auth().onAuthStateChanged((user) => {
       this.setState({
         isLoading: false,
-        isLoggedIn: !!user,
+        isLoggedIn: user,
       });
     });
   }
@@ -601,10 +607,32 @@ class MeComp extends React.Component {
       return <SignIn />;
     }
     return (
-      <div>
-        <Link to="/me">Home</Link> <Link to="/me/journals">Journals</Link>{" "}
-        <Link to="/me/account">Account</Link>{" "}
-        <button onClick={() => firebase.auth().signOut()}>Sign out</button>
+      <div className="Me-container">
+        <div className="Me-header">
+          <h2 className="Me-header-logo">
+            <NavLink className="Me-header-logo-link" to="/me">
+              📝 journaltogether
+            </NavLink>
+          </h2>
+          <div className="Me-header-menu-container">
+            <NavLink exact className="Me-header-menu-item" to="/me">
+              Home
+            </NavLink>
+            <NavLink className="Me-header-menu-item" to="/me/journals">
+              Journals
+            </NavLink>
+            <NavLink className="Me-header-menu-item" to="/me/account">
+              Account
+            </NavLink>
+            <a
+              className="Me-header-menu-item"
+              href="#"
+              onClick={() => firebase.auth().signOut()}
+            >
+              Sign out
+            </a>
+          </div>
+        </div>
         <Switch>
           <Route path="/me/journals">
             <Journals />
@@ -650,7 +678,9 @@ class MagicAuthComp extends React.Component {
         },
         () => {
           this.props.history.push("/me");
-          message.error('This magic link did not seem to work. Please try again')
+          message.error(
+            "This magic link did not seem to work. Please try again"
+          );
         }
       );
   }
@@ -658,7 +688,7 @@ class MagicAuthComp extends React.Component {
   render() {
     const { isLoading, errorMessage } = this.state;
     if (isLoading) {
-      return <FullScreenSpin message="Signing in..." />
+      return <FullScreenSpin message="Signing in..." />;
     }
     return null;
   }
@@ -671,8 +701,16 @@ function HomeComp({ history }) {
     <div className="Home">
       <div className="Home-menu">
         <div className="Home-menu-item-container">
-          <a className="Home-menu-item" href="mailto:stepan.p@gmail.com" target="_blank">Contact us</a>
-          <Link className="Home-menu-item" to="/me">Sign in</Link>
+          <a
+            className="Home-menu-item"
+            href="mailto:stepan.p@gmail.com"
+            target="_blank"
+          >
+            Contact us
+          </a>
+          <Link className="Home-menu-item" to="/me">
+            Sign in
+          </Link>
         </div>
       </div>
       <div className="Home-hero">

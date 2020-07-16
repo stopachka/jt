@@ -165,3 +165,31 @@ button {
 .Sign-in-success-title {
   font-weight: bolder; 
 }
+
+.Me-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: medium;
+  margin: 1em 0;
+}
+
+.Me-header-logo {
+  margin-bottom: 0;
+}
+
+.Me-header-logo-link {
+  color: rgba(0, 0, 0, 0.85);
+  font-weight: bolder;
+}
+
+.Me-header-menu-item {
+  font-weight: 500;
+  padding: 0.5em;
+  margin: 0 0.5em;
+  background: transparent;
+}
+
+.Me-header-menu-item.active {
+  background: rgba(0, 0, 0, 0.04);
+}
