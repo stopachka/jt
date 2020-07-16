@@ -160,6 +160,7 @@ class ProfileHome extends React.Component {
     this._userGroupIdsRef = firebase
       .database()
       .ref(`/users/${firebase.auth().currentUser.uid}/groups`);
+    this._inviteFormRefs = {};
   }
   componentDidMount() {
     fetch(serverPath("api/me/schedule"), {
@@ -248,7 +249,7 @@ class ProfileHome extends React.Component {
         {schedule && schedule["reminder-ms"] && (
           <div className="Profile-schedule-container">
             <h2 className="Profile-schedule-title">
-              Your next reminder:{' '}
+              Your next reminder:{" "}
               <span className="Profile-schedule-reminder-date">
                 {new Date(schedule["reminder-ms"]).toLocaleString("en-US", {
                   weekday: "long",
@@ -258,149 +259,265 @@ class ProfileHome extends React.Component {
               </span>
             </h2>
             <p className="Profile-schedule-desc">
-              🙌 Welcome. Watch your email around {new Date(schedule["reminder-ms"]).toLocaleString("en-US", {
-                  weekday: "long",
-                  hour: "numeric",
-                  minute: "numeric",
-                })}. You'll receive an email from Journal Buddy, asking about your day. We'll record your answers as journal entries
+              🙌 Welcome. Watch your email around{" "}
+              {new Date(schedule["reminder-ms"]).toLocaleString("en-US", {
+                weekday: "long",
+                hour: "numeric",
+                minute: "numeric",
+              })}
+              . You'll receive an email from Journal Buddy, asking about your
+              day. We'll record your answers as journal entries
             </p>
           </div>
         )}
-        <div className="Profile-groups-container">
-          <h2 className="Profile-groups-title">Your Groups</h2>
-          {groupEntries.length === 0 ? (
-            <div className="Profile-empty-groups-container">
-              Want to journal with your friends?
-            </div>
-          ) : null}
-        </div>
-        {groupEntries.map(([k, g]) => {
-          return (
-            <div key={k}>
-              <h4>
-                {g.name}{" "}
-                {
-                  <button
-                    onClick={() => {
-                      const userKeysToDelete =
-                        (g.users &&
-                          Object.keys(g.users).reduce((res, uk) => {
-                            res[`/users/${uk}/groups/${k}`] = null;
-                            return res;
-                          }, {})) ||
-                        {};
-                      firebase
-                        .database()
-                        .ref()
-                        .update({
-                          [`/groups/${k}`]: null,
-                          ...userKeysToDelete,
+        {groupEntries.length > 0 && (
+          <div className="Profile-groups-container">
+            <h2 className="Profile-groups-title">Your groups</h2>
+            {groupEntries.map(([k, g]) => {
+              return (
+                <div className="Profile-group">
+                  <div className="Profile-group-header">
+                    <h3 className="Profile-group-header-title">{g.name}</h3>
+                    <Button
+                      className="Profile-group-header-btn"
+                      type="default"
+                      onClick={() => {
+                        Modal.confirm({
+                          icon: <ExclamationCircleOutlined />,
+                          title: "Are you absolutely sure?",
+                          content: (
+                            <p>
+                              You're about to this group. This group will
+                              disappear for all invited members
+                            </p>
+                          ),
+                          okText: "Yes, delete this gorup",
+                          okType: "danger",
+                          onOk() {
+                            const userKeysToDelete =
+                              (g.users &&
+                                Object.keys(g.users).reduce((res, uk) => {
+                                  res[`/users/${uk}/groups/${k}`] = null;
+                                  return res;
+                                }, {})) ||
+                              {};
+                            firebase
+                              .database()
+                              .ref()
+                              .update({
+                                [`/groups/${k}`]: null,
+                                ...userKeysToDelete,
+                              });
+                          },
                         });
-                    }}
-                  >
-                    delete group!
-                  </button>
-                }
-              </h4>
-              <div>
-                {g.users &&
-                  Object.entries(g.users).map(([uk, u], i, arr) => {
-                    return (
-                      <p key={u.email}>
-                        {u.email}{" "}
-                        {arr.length > 1 && (
-                          <button
-                            onClick={() => {
-                              firebase
-                                .database()
-                                .ref()
-                                .update({
-                                  [`/groups/${k}/users/${uk}`]: null,
-                                  [`/users/${uk}/groups/${k}`]: null,
-                                });
-                            }}
-                          >
-                            delete user!
-                          </button>
-                        )}
-                      </p>
-                    );
-                  })}
+                      }}
+                    >
+                      Delete Group
+                    </Button>
+                  </div>
+                  <div>
+                    {g.users && (
+                      <div className="Profile-group-users-container">
+                        <h4 className="Profile-group-users-title">Members</h4>
+                        {Object.entries(g.users).map(([uk, u], i, arr) => {
+                          return (
+                            <div className="Profile-group-user" key={u.email}>
+                              <p className="Profile-group-user-title">
+                                {u.email}
+                              </p>
+                              {arr.length > 1 && (
+                                <Button
+                                  className="Profile-group-user-remove-btn"
+                                  onClick={() => {
+                                    Modal.confirm({
+                                      icon: <ExclamationCircleOutlined />,
+                                      title: "Are you absolutely sure?",
+                                      content: (
+                                        <p>
+                                          You're about remove a user from this
+                                          group. This can't be undone
+                                        </p>
+                                      ),
+                                      okText: "Yes, remove this user",
+                                      okType: "danger",
+                                      onOk() {
+                                        firebase
+                                          .database()
+                                          .ref()
+                                          .update({
+                                            [`/groups/${k}/users/${uk}`]: null,
+                                            [`/users/${uk}/groups/${k}`]: null,
+                                          })
+                                          .catch((e) => {
+                                            message.error(
+                                              "Uh oh, I was not able to delete this group. Please try again"
+                                            );
+                                          });
+                                      },
+                                    });
+                                  }}
+                                >
+                                  Remove
+                                </Button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                  <div className="Profile-group-invite-user-container">
+                    <h4 className="Profile-group-invite-user-title">
+                      Invite your friends
+                    </h4>
+                    <p className="Profile-grop-invite-user-content">
+                      Want to add friends to {g.name}? Give us their email and
+                      we'll ask them to join!
+                    </p>
+                    <Form
+                      ref={(x) => {
+                        this._inviteFormRefs[k] = x;
+                      }}
+                      onFinish={({ email }) => {
+                        this._inviteFormRefs[k] &&
+                          this._inviteFormRefs[k].resetFields();
+
+                        const invitationRef = firebase
+                          .database()
+                          .ref("/invitations")
+                          .push();
+
+                        message.success(
+                          "Oky doke, we're sending your friend an invitation!"
+                        );
+                        invitationRef
+                          .set({
+                            "sender-email": firebase.auth().currentUser.email,
+                            "receiver-email": email,
+                            "group-id": k,
+                          })
+                          .then(() => {
+                            fetch(serverPath("api/me/invite-user"), {
+                              method: "POST",
+                              headers: {
+                                "Content-Type": "application/json",
+                              },
+                              body: JSON.stringify({
+                                "invitation-id": invitationRef.key,
+                              }),
+                            }).then((x) => {
+                              return x.status === 200
+                                ? x.json()
+                                : Promise.reject(x.json());
+                            });
+                          })
+                          .catch(() => {
+                            message.error(
+                              "Uh oh, we couldn't send this invitation. Please try again"
+                            );
+                          });
+                      }}
+                    >
+                      <Form.Item
+                        name="email"
+                        rules={[
+                          {
+                            required: true,
+                            message: "Let us know your friend's email",
+                          },
+                        ]}
+                      >
+                        <Input
+                          className="Profile-group-input"
+                          placeholder="Your friend's email: i.e super-cool-joe@gmail.com"
+                          size="large"
+                          type="email"
+                          suffix={
+                            <Button
+                              className="Profile-group-submit-btn"
+                              size="large"
+                              type="primary"
+                              htmlType="submit"
+                            >
+                              Invite your friend
+                            </Button>
+                          }
+                        />
+                      </Form.Item>
+                    </Form>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <div className="Profile-create-group-container">
+          <h2 className="Profile-create-group-title">
+            {groupEntries.length === 0
+              ? "Create your first group"
+              : "Create more groups"}
+          </h2>
+          <div className="Profile-create-group-content">
+            {groupEntries.length === 0 ? (
+              <div className="Profile-create-group-empty-content">
+                You're now able to journal by yourself. Buut, if you like, you
+                can journal with your friends! To do that, you need to create a
+                group.
               </div>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const email = this._friendEmailInput.value;
-                  this._friendEmailInput.value = "";
-                  const invitationRef = firebase
-                    .database()
-                    .ref("/invitations")
-                    .push();
-                  alert("ok, sent! this will be a cool flash message later");
-                  invitationRef
-                    .set({
-                      "sender-email": firebase.auth().currentUser.email,
-                      "receiver-email": email,
-                      "group-id": k,
-                    })
-                    .then(() => {
-                      fetch(serverPath("api/me/invite-user"), {
-                        method: "POST",
-                        headers: {
-                          "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({
-                          "invitation-id": invitationRef.key,
-                        }),
-                      }).then((x) => {
-                        return x.status === 200
-                          ? x.json()
-                          : Promise.reject(x.json());
-                      });
-                    })
-                    .then(
-                      () => {},
-                      () => {
-                        this.setState({
-                          errorMessage: "oi...failed invite user",
-                        });
-                      }
-                    );
+            ) : (
+              <div className="Profile-create-more-groups-content">
+                You already have a group, and can invite friends there. However,
+                if you want to have updates with multiple friend groups, you can
+                create more groups
+              </div>
+            )}
+          </div>
+          <Form
+            ref={(x) => {
+              this._createGroupForm = x;
+            }}
+            onFinish={({ groupName }) => {
+              this._createGroupForm.resetFields();
+              const groupKey = firebase.database().ref("/groups/").push().key;
+              const uid = firebase.auth().currentUser.uid;
+              const email = firebase.auth().currentUser.email;
+              firebase
+                .database()
+                .ref()
+                .update({
+                  [`/groups/${groupKey}/name`]: groupName,
+                  [`/groups/${groupKey}/users/${uid}/email`]: email,
+                  [`/users/${uid}/groups/${groupKey}`]: true,
+                });
+            }}
+          >
+            <Form.Item
+              name="groupName"
+              rules={[
+                { required: true, message: "Think up a name for your group" },
+              ]}
+            >
+              <Input
+                className="Profile-group-input"
+                placeholder="Name your group: i.e The Fam"
+                size="large"
+                ref={(ref) => {
+                  this._groupNameInput = ref;
                 }}
-              >
-                <input
-                  placeholder="your friend's email"
-                  ref={(x) => {
-                    this._friendEmailInput = x;
-                  }}
-                />
-                <button type="submit">invite</button>
-              </form>
-              <hr />
-            </div>
-          );
-        })}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            const name = this._groupNameInput.value;
-            this._groupNameInput.value = "";
-            const groupKey = firebase.database().ref("/groups/").push().key;
-            const uid = firebase.auth().currentUser.uid;
-            const email = firebase.auth().currentUser.email;
-            firebase
-              .database()
-              .ref()
-              .update({
-                [`/groups/${groupKey}/name`]: name,
-                [`/groups/${groupKey}/users/${uid}/email`]: email,
-                [`/users/${uid}/groups/${groupKey}`]: true,
-              });
-          }}
-        >
-          <input label="group name" ref={(x) => (this._groupNameInput = x)} />
-          <button type="submit">create a group</button>
-        </form>
+                suffix={
+                  <Button
+                    className="Profile-group-submit-btn"
+                    size="large"
+                    type="primary"
+                    htmlType="submit"
+                  >
+                    Create a group 🚀
+                  </Button>
+                }
+              />
+            </Form.Item>
+          </Form>
+        </div>
       </div>
     );
   }

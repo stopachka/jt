@@ -267,6 +267,41 @@ button {
   font-size: medium;
 }
 
+.Profile-groups-container {
+  margin-bottom: 1em;
+}
+
+.Profile-group-header {
+  margin-bottom: 1em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.Profile-group {
+  padding-bottom: 1em;
+  margin-bottom: 1em;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.Profile-group-header-title { 
+  font-weight: bold;
+  margin-bottom: 0;
+}
+
+.Profile-group-user {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.Profile-group-user-title {
+  margin-bottom: none;
+}
+
+.Profile-create-group-content {
+  margin-bottom: 1em;
+}
+
 .Profile-schedule-reminder-date {
   color: blue;
 }

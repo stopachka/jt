@@ -194,12 +194,14 @@
 (defn content-group-invitation [sender-email receiver-email magic-code]
   {:from signup-email-with-name
    :to receiver-email
-   :subject "You've been invited to join a group on JournalTogether"
+   :subject "You've been invited to join a group on Journal Together"
    :html
    (str
-     "<p>Hello there!</p>"
-     "<p>" sender-email " has invited you to join their group on Journal Together</p>"
-     "<p> Visit " (url-with-magic-code magic-code) " to join them")})
+     "<p>Howdy,</p>"
+     "<p>" sender-email " has invited you to join their group on Journal Together.</p>"
+     "<p>If you don't know what this is about, please ask em : )</p>"
+     "<p>To get started, open this link:</p>"
+     "<p><strong>" (url-with-magic-code magic-code) "</strong></p>")})
 
 (defn content-user-does-not-exist [from to subject]
   {:from from
@@ -371,7 +373,7 @@
   (let [{:keys [invitation-id]} body]
     (let [{:keys [sender-email receiver-email] :as invitation}
           (db/get-invitation-by-id invitation-id)
-
+          _ (log/debugf "invitation %s" invitation)
           _ (assert invitation (format "Invalid invitation id = %s" invitation-id))
           _ (assert (email? receiver-email) (format "Invalid email = %s" receiver-email))]
       (->> {:email receiver-email :invitations [invitation-id]}
