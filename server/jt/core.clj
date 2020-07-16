@@ -72,11 +72,10 @@
 
 (defn send-email [content]
   (log/infof "[mail] sending content=%s" content)
-  (when (or true (= profile/env :prod))
-    (mail/send-mail
-      {:key (profile/get-secret :mailgun :api-key)
-       :domain (profile/get-config :mailgun :domain)}
-      content)))
+  (mail/send-mail
+    {:key (profile/get-secret :mailgun :api-key)
+     :domain (profile/get-config :mailgun :domain)}
+    content))
 
 ;; ------------------------------------------------------------------------------
 ;; Schedule
