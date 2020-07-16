@@ -337,7 +337,6 @@ class Journals extends React.Component {
     super(props);
     this.state = {
       isLoadingJournals: true,
-      errorMessage: null,
       isLoadingLevel: true,
       journals: null,
       level: null,
@@ -349,7 +348,9 @@ class Journals extends React.Component {
       .ref(`/users/${firebase.auth().currentUser.uid}/level`)
       .on("value", (snap) =>
         this.setState({ isLoadingLevel: false, level: snap.val() })
-      );
+      , (err) => {
+        message.error('Uh oh, we could not access your journals.');
+      });
     firebase
       .database()
       .ref(`/entries/${firebase.auth().currentUser.uid}/`)
@@ -362,8 +363,7 @@ class Journals extends React.Component {
           });
         },
         (err) => {
-          console.log(`/entries/${firebase.auth().currentUser.uid}/`);
-          this.setState({ errorMessage: "oi can't access journals" });
+          message.error('Uh oh, we could not access your journals.');
         }
       );
   }
@@ -376,58 +376,73 @@ class Journals extends React.Component {
       journals,
       level,
     } = this.state;
-    if (errorMessage) {
-      return <div>{errorMessage}</div>;
-    }
     if (isLoadingJournals) {
-      return <div>Loading...</div>;
+      return <FullScreenSpin />
     }
     const journalEntries = Object.entries(journals || {});
     if (journalEntries.length === 0) {
       return (
-        <div>You don't have journals yet. You'll see them here soon : ]</div>
+        <div className="Empty-journals-container">
+          <div className="Empty-journals">
+            <h2 className="Empty-journals-title">You don't have any journals yet</h2>
+            <p className="Empty-journals-desc">Journal Buddy should send you an email asking about your day soon. Once you answer, those entries will show up here. Check back soon! 😊</p>
+          </div>
+        </div>
       );
     }
     return (
-      <div>
+      <div className="Journal-entries-container">
         {journalEntries
           .sort(([ka, _a], [kb, _b]) => +kb - +ka)
           .map(([k, j]) => {
             return (
-              <div key={k}>
-                <button
-                  onClick={(e) => {
-                    firebase
-                      .database()
-                      .ref(`/entries/${firebase.auth().currentUser.uid}/${k}`)
-                      .set(null);
-                  }}
-                >
-                  delete
-                </button>
-                <h3>
-                  {new Date(j["date"]).toLocaleString("en-US", {
-                    weekday: "short",
-                    month: "long",
-                    day: "numeric",
-                    hour: "numeric",
-                  })}
-                </h3>
-                <div
-                  dangerouslySetInnerHTML={{
-                    __html: marked(j["stripped-text"]),
-                  }}
-                ></div>
-                <hr />
+              <div className="Journal-entry-container" key={k}>
+                <div className="Journal-entry-header">
+                  <h3 className="Journal-entry-header-title">
+                    {new Date(j["date"]).toLocaleString("en-US", {
+                      weekday: "short",
+                      month: "long",
+                      day: "numeric",
+                      hour: "numeric",
+                    })}
+                  </h3>
+                  <Button
+                    className="Journal-entry-header-btn"
+                    type="default"
+                    onClick={(e) => {
+                      firebase
+                        .database()
+                        .ref(`/entries/${firebase.auth().currentUser.uid}/${k}`)
+                        .set(null);
+                    }}
+                  >
+                    Delete this entry
+                  </Button>
+                </div>
+                <div className="Journal-entry-content-container">
+                  <div
+                    dangerouslySetInnerHTML={{
+                      __html: marked(j["stripped-text"]),
+                    }}
+                  ></div>
+                </div>
               </div>
             );
           })}
         {!isLoadingLevel && level !== "premium" ? (
-          <div>
-            <h3>
-              Want to access journals gr 1 month? Upgrade to premium!{" "}
-              <Link to="/me/account">Learn more</Link>
-            </h3>
+          <div className="Journal-upsell-container">
+            <h1 className="Journal-upsell-title">
+              Want to access all your journals for life?
+            </h1>
+            <p className="Journal-upsell-content">
+              Right now you only have access to entries in the past month. Upgrade to access all your journals for life.
+            </p>
+            <Button 
+              className="Journal-upsell-btn"
+              type="primary"
+              to="/me/account">
+                Learn more
+            </Button>
           </div>
         ) : null}
       </div>
