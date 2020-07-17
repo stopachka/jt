@@ -132,7 +132,7 @@
          page (-> (FirebaseAuth/getInstance)
                   (.listUsers nil))]
     (if page
-      (recur (concat
+      (recur (into
                ret
                (map user-record->map (.getValues page)))
              (.getNextPage page))
