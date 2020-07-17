@@ -267,7 +267,15 @@ class ProfileHome extends React.Component {
                 minute: "numeric",
               })}
               . You'll receive an email from Journal Buddy, asking about your
-              day. We'll record your answers as journal entries
+              day. We'll record your answers as journal entries. Don't want to
+              wait? Simply send an email to{" "}
+              <a
+                href="mailto:journal-buddy@mg.journaltogether.com"
+                target="_blank"
+              >
+                journal-buddy@mg.journaltogether.com
+              </a>
+              , and you can log right away
             </p>
           </div>
         )}
@@ -653,11 +661,11 @@ class JournalsComp extends React.Component {
         {!isLoadingLevel && level !== "premium" ? (
           <div className="Journal-upsell-container">
             <h1 className="Journal-upsell-title">
-              Want to access all your journals for life?
+              Would you like to be a patron of Journal Together?
             </h1>
             <p className="Journal-upsell-content">
-              Right now you only have access to entries in the past month.
-              Upgrade to access all your journals for life.
+              If Journal Together has been useful to you, consider upgrading to
+              🏅Premium. Your support goes a long way.
             </p>
             <Button
               className="Journal-upsell-btn"
@@ -785,9 +793,7 @@ class AccountComp extends React.Component {
                   <p className="Account-memberip-content">
                     Thank you for using Journal Together. How has your
                     experience been? If you've liked it, want to support the
-                    product, and gain access to journals for life, consider
-                    upgrading to 🏅Premium. No matter what we are happy you are
-                    our customer 😊
+                    product, consider upgrading to 🏅Premium.
                   </p>
                 </div>
                 <Button
@@ -839,6 +845,21 @@ class AccountComp extends React.Component {
               </div>
             )}
           </div>
+        </div>
+        <div className="Account-delete-container">
+          <h2 className="Account-delete-title">Sign out</h2>
+          <p className="Account-delete-content">
+            Want to sign out? Sure thing. Click this handy link to sign out
+          </p>
+          <Button
+            size="large"
+            type="default"
+            onClick={(e) => {
+              firebase.auth().signOut();
+            }}
+          >
+            Sign out
+          </Button>
         </div>
         <div className="Account-delete-container">
           <h2 className="Account-delete-title">Delete your account</h2>
@@ -952,10 +973,10 @@ class MeComp extends React.Component {
             </NavLink>
             <a
               className="Me-header-menu-item"
-              href="#"
-              onClick={() => firebase.auth().signOut()}
+              href="mailto:stepan.p@gmail.com"
+              target="_blank"
             >
-              Sign out
+              Contact us
             </a>
           </div>
         </div>
@@ -1098,28 +1119,24 @@ function HomeComp({ history }) {
         <div className="Home-faq-section">
           <h3>Q: How much does this cost?</h3>
           <p>
-            You are free to use Journal Together as long as you like.{" "}
-            <strong>
-              There is a premium membership that costs $10 a month
-            </strong>
-            . If you choose the premium membership, you'll have access to your
-            journals since the beginning of time. A standard membership on shows
-            the last one month's worth.
+            <strong>All features of Journal Together are free.</strong> If you
+            would like to support the service though, there is a premium
+            membership at $10 / month. It's main purpose is for patronage:
+            you'll have the same features, but you'll see a nice 🏅tag on your
+            account, and I'll be grateful to ya : )
           </p>
         </div>
         <div className="Home-faq-section">
           <h3>Q: Can I just use this for myself?</h3>
           <p>
-            Absolutely. If you choose to invite friends, you'll all receive a
-            summary email. If you'd like to use this as a personal journal, you
-            are free to do that. If you don't create any groups, you'll still be
-            able to log and view your journals.
+            Absolutely. If you don't create any groups, you'll still be able to
+            log and view your journals.
           </p>
         </div>
         <div className="Home-faq-section">
           <h3>Q: What will you do with my data?</h3>
           <p>
-            These are your journal entries. We respect the heck out of that. I
+            These are your journal entries. I respect the heck out of that. I
             won't use or sell your data. If you report a bug, I may have to go
             through it. Whenever I do, I'll let you know. I'll put my{" "}
             <a

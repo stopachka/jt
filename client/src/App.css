@@ -276,7 +276,7 @@ button {
   margin: 0 auto;
 }
 
-.Account-membership-container {
+.Account-membership-container, .Account-delete-container {
   margin-bottom: 2em;
 }
 
