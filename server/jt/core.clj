@@ -212,7 +212,16 @@
      "<p>Oi, you need to sign up to use journaltogether</p>"
      "<p>Visit https://journaltogether.com/me to sign up</p>")})
 
-
+(defn content-notify-ceo-about-magic [{:keys [email] :as magic}]
+  {:from "Journal CEO Assistant <ceo-notifier@mg.journaltogether.com>"
+   :to (profile/get-config :ceo-email)
+   :subject (str "New magic usage by " (-> email
+                                           (str/split #"@")
+                                           first))
+   :html
+   (str
+     "<p>" email " just used a magic code. Here's what it says:</p>"
+     "<pre><code>"magic "</code></pre>")})
 ;; ------------------------------------------------------------------------------
 ;; Outgoing Mail
 
@@ -358,9 +367,11 @@
 
 (defn magic-auth-handler [{:keys [body] :as _req}]
   (let [{:keys [code]} body
-        {:keys [email invitations]} (db/consume-magic-code code)
+        {:keys [email invitations] :as magic} (db/consume-magic-code code)
 
         _ (assert (email? email) (str "Expected a valid email =" email))]
+    (fut-bg
+      (send-email (content-notify-ceo-about-magic magic)))
     (let [{:keys [uid]} (or (db/get-user-by-email email)
                             (db/create-user email))]
       (pmap accept-invitation invitations)

@@ -1,5 +1,6 @@
 {:port 8080
  :static-root "public"
+ :ceo-email "stepan.p@gmail.com"
  :mailgun {:domain "mg.journaltogether.com"}
  :stripe
  {:premium-price-id "price_1H4IDVGnGs7xopb5ZhBQ2hnU"
