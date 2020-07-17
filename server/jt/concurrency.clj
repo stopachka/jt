@@ -1,6 +1,10 @@
 (ns jt.concurrency
-  (:require [clojure.tools.logging :as log])
-  (:import (clojure.lang IDeref)))
+  (:require
+    [clojure.tools.logging :as log])
+  (:import
+    (clojure.lang
+      IDeref)))
+
 
 (defmacro fut-bg
   "Futures only throw when de-referenced. fut-bg writes a future
@@ -14,6 +18,7 @@
          (log/errorf e# "uh-oh, failed to run async function %s" '~forms)
          (throw e#)))))
 
+
 (defn throwable-promise
   "clojure promises do not have a concept of reject.
   this mimics the idea: you can pass a function, which receives
@@ -25,7 +30,8 @@
         resolve #(deliver p [nil %])
         reject #(deliver p [% nil])
         throwable-p (reify IDeref
-                      (deref [_this]
+                      (deref
+                        [_this]
                         (let [[err res] @p]
                           (if err (throw err) res))))]
     (f resolve reject)

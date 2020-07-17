@@ -1,35 +1,51 @@
 (ns jt.core
   (:gen-class)
-  (:require [chime.core :as chime-core]
-            [clojure.string :as str]
-            [clojure.tools.logging :as log]
-            [jt.db :as db]
-            [jt.concurrency :refer [fut-bg]]
-            [jt.profile :as profile]
-            [compojure.core :refer [context routes defroutes GET POST]]
-            [compojure.route :refer [resources]]
-            [io.aviso.logging.setup]
-            [mailgun.mail :as mail]
-            [markdown.core :as markdown-core]
-            [ring.adapter.jetty :as jetty]
-            [ring.middleware.json :refer [wrap-json-body wrap-json-response]]
-            [ring.middleware.keyword-params :refer [wrap-keyword-params]]
-            [ring.middleware.params :refer [wrap-params]]
-            [ring.middleware.cors :refer [wrap-cors]]
-            [ring.util.request :refer [body-string]]
-            [ring.util.response :as resp :refer [response bad-request]])
-  (:import (java.time LocalTime ZonedDateTime ZoneId Period Instant)
-           (java.time.format DateTimeFormatter)
-           (com.google.firebase.database DatabaseException)
-           (com.stripe.model.checkout Session)
-           (com.stripe Stripe)
-           (com.stripe.net Webhook)
-           (com.stripe.model Event Subscription)))
+  (:require
+    [chime.core :as chime-core]
+    [clojure.string :as str]
+    [clojure.tools.logging :as log]
+    [compojure.core :refer [context routes defroutes GET POST]]
+    [compojure.route :refer [resources]]
+    [io.aviso.logging.setup]
+    [jt.concurrency :refer [fut-bg]]
+    [jt.db :as db]
+    [jt.profile :as profile]
+    [mailgun.mail :as mail]
+    [markdown.core :as markdown-core]
+    [ring.adapter.jetty :as jetty]
+    [ring.middleware.cors :refer [wrap-cors]]
+    [ring.middleware.json :refer [wrap-json-body wrap-json-response]]
+    [ring.middleware.keyword-params :refer [wrap-keyword-params]]
+    [ring.middleware.params :refer [wrap-params]]
+    [ring.util.request :refer [body-string]]
+    [ring.util.response :as resp :refer [response bad-request]])
+  (:import
+    (com.google.firebase.database
+      DatabaseException)
+    (com.stripe
+      Stripe)
+    (com.stripe.model
+      Event
+      Subscription)
+    (com.stripe.model.checkout
+      Session)
+    (com.stripe.net
+      Webhook)
+    (java.time
+      Instant
+      LocalTime
+      Period
+      ZoneId
+      ZonedDateTime)
+    (java.time.format
+      DateTimeFormatter)))
 
 ;; ------------------------------------------------------------------------------
 ;; Helpers
 
 (def email-pattern #"(?i)[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?")
+
+
 (defn email?
   [email]
   (and (string? email) (boolean (re-matches email-pattern email))))
@@ -41,36 +57,44 @@
   "i.e Wed Jul 1"
   "E LLL d")
 
+
 (def friend-date-time-pattern
   "Tue 07 14 02:56 PM PDT"
   "E LL d hh:mm a zz")
+
 
 (def day-of-week-pattern
   "i.e Wednesday"
   "EEEE")
 
+
 (def numeric-date-pattern
   "i.e 2020-07-01"
   "yyyy-MM-dd")
+
 
 (defn fmt-with-pattern
   [str-pattern zoned-date]
   (-> (DateTimeFormatter/ofPattern str-pattern)
       (.format zoned-date)))
 
-(defn ->numeric-date-str [zoned-date]
+
+(defn ->numeric-date-str
+  [zoned-date]
   (fmt-with-pattern numeric-date-pattern zoned-date))
 
 ;; ------------------------------------------------------------------------------
 ;; DB
 
-(defn task-path [task-id]
+(defn task-path
+  [task-id]
   (str "/tasks/" task-id))
 
 ;; ------------------------------------------------------------------------------
 ;; Mail
 
-(defn send-email [content]
+(defn send-email
+  [content]
   (log/infof "[mail] sending content=%s" content)
   (mail/send-mail
     {:key (profile/get-secret :mailgun :api-key)
@@ -81,27 +105,40 @@
 ;; Schedule
 
 (def pst-zone (ZoneId/of "America/Los_Angeles"))
-(defn pst-now []
+
+
+(defn pst-now
+  []
   (ZonedDateTime/now pst-zone))
 
-(defn pst-instant [h m s]
+
+(defn pst-instant
+  [h m s]
   (-> (LocalTime/of h m s)
       (.adjustInto (pst-now))
       .toInstant))
 
-(defn daily-period [inst]
+
+(defn daily-period
+  [inst]
   (chime-core/periodic-seq inst (Period/ofDays 1)))
 
-(defn after-now [period]
+
+(defn after-now
+  [period]
   (let [now (Instant/now)]
     (filter #(.isAfter % now) period)))
 
-(defn reminder-period []
+
+(defn reminder-period
+  []
   (-> (pst-instant 16 0 0)
       daily-period
       after-now))
 
-(defn summary-period []
+
+(defn summary-period
+  []
   (-> (pst-instant 9 0 0)
       daily-period
       after-now))
@@ -109,22 +146,34 @@
 ;; ------------------------------------------------------------------------------
 ;; Content
 
-(defn email-with-name [email name]
+(defn email-with-name
+  [email name]
   (str name " <" email ">"))
 
+
 (def hows-your-day-email "journal-buddy@mg.journaltogether.com")
+
+
 (def hows-your-day-email-with-name
   (email-with-name hows-your-day-email "Journal Buddy"))
 
+
 (def summary-email "journal-summary@mg.journaltogether.com")
+
+
 (def summary-email-with-name
   (email-with-name summary-email "Journal Summary"))
 
+
 (def signup-email "sign-up@mg.journaltogether.com")
+
+
 (def signup-email-with-name
   (email-with-name signup-email "Journal Signup"))
 
-(defn content-hows-your-day? [day email]
+
+(defn content-hows-your-day?
+  [day email]
   {:from hows-your-day-email-with-name
    :to email
    :subject (str
@@ -138,22 +187,28 @@
         "How was your day today? What's been on your mind? 😊 📝"
         "</p>")})
 
-(defn ->entry-html [{:keys [date stripped-text]}]
+
+(defn ->entry-html
+  [{:keys [date stripped-text]}]
   (str
     "<p><b>"
     (fmt-with-pattern friend-date-time-pattern date)
     "</b></p>"
     (markdown-core/md-to-html-string stripped-text)))
 
-(defn ->user-section-html [[{:keys [email] :as _user} entries]]
+
+(defn ->user-section-html
+  [[{:keys [email] :as _user} entries]]
   (str
-    "<h3>"email"</h3>"
+    "<h3>" email "</h3>"
     (->> entries
          (filter seq)
          (map ->entry-html)
          str/join)))
 
-(defn content-summary [day to users-with-entries]
+
+(defn content-summary
+  [day to users-with-entries]
   (let [friendly-date-str (fmt-with-pattern friendly-date-pattern day)]
     {:from summary-email-with-name
      :to to
@@ -166,7 +221,9 @@
                (map ->user-section-html)
                str/join))}))
 
-(defn content-ack-receive [to, subject]
+
+(defn content-ack-receive
+  [to, subject]
   {:from hows-your-day-email-with-name
    :to to
    :subject subject
@@ -175,10 +232,14 @@
            "<p>To manage your journals, you can always visit https://www.journaltogether.com/me/journals</p>"
            "<p>See ya</p>")})
 
-(defn url-with-magic-code [magic-code]
+
+(defn url-with-magic-code
+  [magic-code]
   (str "https://www.journaltogether.com/magic/" magic-code))
 
-(defn content-magic-code-response [to magic-code]
+
+(defn content-magic-code-response
+  [to magic-code]
   {:from signup-email-with-name
    :to to
    :subject "Magic sign-in link for Journal Together"
@@ -186,12 +247,14 @@
    (str
      "<p>Hey there, you asked us to send you a magic link to sign into Journal Together.</p>"
      "<p>Here it is:</p>"
-     "<p><strong>"(url-with-magic-code magic-code) "<strong></p>"
+     "<p><strong>" (url-with-magic-code magic-code) "<strong></p>"
      "<p>Once you open that link, you'll be signed in and ready to go!</p>"
      "<p>Note: your magic link can only be used once.</p>"
      "<p>See ya :)</p>")})
 
-(defn content-group-invitation [sender-email receiver-email magic-code]
+
+(defn content-group-invitation
+  [sender-email receiver-email magic-code]
   {:from signup-email-with-name
    :to receiver-email
    :subject "You've been invited to join a group on Journal Together"
@@ -203,7 +266,9 @@
      "<p>To get started, open this link:</p>"
      "<p><strong>" (url-with-magic-code magic-code) "</strong></p>")})
 
-(defn content-user-does-not-exist [from to subject]
+
+(defn content-user-does-not-exist
+  [from to subject]
   {:from from
    :to to
    :subject subject
@@ -212,7 +277,9 @@
      "<p>Oi, you need to sign up to use journaltogether</p>"
      "<p>Visit https://journaltogether.com/me to sign up</p>")})
 
-(defn content-notify-ceo-about-magic [{:keys [email] :as magic}]
+
+(defn content-notify-ceo-about-magic
+  [{:keys [email] :as magic}]
   {:from "Journal CEO Assistant <ceo-notifier@mg.journaltogether.com>"
    :to (profile/get-config :ceo-email)
    :subject (str "New magic usage by " (-> email
@@ -221,7 +288,7 @@
    :html
    (str
      "<p>" email " just used a magic code. Here's what it says:</p>"
-     "<pre><code>"magic "</code></pre>")})
+     "<pre><code>" magic "</code></pre>")})
 ;; ------------------------------------------------------------------------------
 ;; Outgoing Mail
 
@@ -238,7 +305,9 @@
       (log/infof "[task] skipping %s" task-id)
       nil)))
 
-(defn handle-reminder [_]
+
+(defn handle-reminder
+  [_]
   (let [day (pst-now)
         task-id (str "send-reminder-" (->numeric-date-str day))]
     (when (try-grab-task task-id)
@@ -248,6 +317,7 @@
                      (send-email (content-hows-your-day? day email))
                      (catch Exception e
                        (log/errorf e "failed to send reminder for user = %s" user)))))))))
+
 
 (defn send-summary
   [start-date group-id group]
@@ -271,7 +341,9 @@
         (send-email
           (content-summary start-date (map :email users) users-with-entries))))))
 
-(defn handle-summary [_]
+
+(defn handle-summary
+  [_]
   (let [start-date (.minusDays (pst-now) 1)
         task-id (str "handle-summary-" (->numeric-date-str start-date))]
     (when (try-grab-task task-id)
@@ -291,7 +363,9 @@
       DateTimeFormatter/ofPattern
       (.withZone pst-zone)))
 
-(defn parse-email-date [params]
+
+(defn parse-email-date
+  [params]
   (-> params
       :Date
       (ZonedDateTime/parse mailgun-date-formatter)))
@@ -299,7 +373,8 @@
 ;; ------------------------------------------------------------------------------
 ;; handle-hows-your-day-response
 
-(defn handle-hows-your-day-response [data]
+(defn handle-hows-your-day-response
+  [data]
   (let [{:keys [sender recipient subject]} data
         {:keys [uid] :as _user} (db/get-user-by-email sender)]
     (cond
@@ -314,7 +389,8 @@
 ;; ------------------------------------------------------------------------------
 ;; emails-handler
 
-(defn emails-handler [{:keys [params] :as _req}]
+(defn emails-handler
+  [{:keys [params] :as _req}]
   (fut-bg
     (let [{:keys [recipient sender] :as data}
           (-> params
@@ -329,7 +405,8 @@
 ;; ------------------------------------------------------------------------------
 ;; magic codes
 
-(defn magic-request-handler [{:keys [body] :as _req}]
+(defn magic-request-handler
+  [{:keys [body] :as _req}]
   (let [{:keys [email]} body]
     (cond
       (not (email? email))
@@ -343,7 +420,9 @@
                send-email)
           (response {:receive true})))))
 
-(defn accept-invitation [id]
+
+(defn accept-invitation
+  [id]
   (let [{:keys [sender-email group-id receiver-email] :as invitation}
         (db/get-invitation-by-id id)
 
@@ -365,7 +444,9 @@
     (db/delete-invitation id)
     (db/add-user-to-group receiver-user group-id)))
 
-(defn magic-auth-handler [{:keys [body] :as _req}]
+
+(defn magic-auth-handler
+  [{:keys [body] :as _req}]
   (let [{:keys [code]} body
         {:keys [email invitations] :as magic} (db/consume-magic-code code)
 
@@ -380,7 +461,8 @@
 ;; ------------------------------------------------------------------------------
 ;; invitations
 
-(defn invite-user-handler [{:keys [body] :as _req}]
+(defn invite-user-handler
+  [{:keys [body] :as _req}]
   (let [{:keys [invitation-id]} body]
     (let [{:keys [sender-email receiver-email] :as invitation}
           (db/get-invitation-by-id invitation-id)
@@ -397,7 +479,8 @@
 ;; ------------------------------------------------------------------------------
 ;; account
 
-(defn delete-account-handler [{:keys [headers] :as _req}]
+(defn delete-account-handler
+  [{:keys [headers] :as _req}]
   (let [{:keys [uid] :as _user} (db/get-user-from-id-token (get headers "token"))]
     (do
       (db/delete-group-memberships uid)
@@ -409,7 +492,8 @@
 ;; ------------------------------------------------------------------------------
 ;; schedule
 
-(defn schedule-handler [_req]
+(defn schedule-handler
+  [_req]
   (response
     {:reminder-ms (.toEpochMilli (first (reminder-period)))
      :summary-ms (.toEpochMilli (first (summary-period)))}))
@@ -417,7 +501,8 @@
 ;; ------------------------------------------------------------------------------
 ;; stripe
 
-(defn cancel-subscription-handler [{:keys [headers] :as _req}]
+(defn cancel-subscription-handler
+  [{:keys [headers] :as _req}]
   (let [{:keys [uid] :as user} (db/get-user-from-id-token (get headers "token"))
         {:keys [customer-id subscription-id] :as _payment-info} (db/get-payment-info uid)
         _ (assert (and customer-id subscription-id)
@@ -432,7 +517,9 @@
           (db/save-user-level uid :standard)))
     (response {:success true})))
 
-(defn create-session-handler [{:keys [headers] :as _req}]
+
+(defn create-session-handler
+  [{:keys [headers] :as _req}]
   (let [{:keys [uid] :as _user} (db/get-user-from-id-token (get headers "token"))
         {:keys [customer-id] :as _payment-info} (db/get-payment-info uid)
 
@@ -449,7 +536,9 @@
            "payment_method_types" ["card"]})]
     (response {:id (.getId session)})))
 
-(defn handle-stripe-webhook-event [evt]
+
+(defn handle-stripe-webhook-event
+  [evt]
   (condp = (.getType evt)
     "checkout.session.completed"
     (let [^Session session (-> evt .getDataObjectDeserializer .getObject .get)
@@ -470,7 +559,9 @@
 
     (log/infof "ignoring evt %s " evt)))
 
-(defn webhooks-stripe-handler [{:keys [headers] :as req}]
+
+(defn webhooks-stripe-handler
+  [{:keys [headers] :as req}]
   (let [sig (get headers "stripe-signature")
         body-str (body-string req)
         ^Event evt (Webhook/constructEvent
@@ -483,37 +574,44 @@
 ;; ------------------------------------------------------------------------------
 ;; Server
 
-(defn render-static-file [filename]
+(defn render-static-file
+  [filename]
   (resp/content-type
     (resp/resource-response filename {:root (profile/get-config :static-root)}) "text/html"))
+
 
 (defroutes
   webhook-routes
   (context "/hooks" []
-    (POST "/stripe" [] webhooks-stripe-handler)))
+           (POST "/stripe" [] webhooks-stripe-handler)))
+
 
 (defroutes
   api-routes
   (context "/api" []
-    (POST "/emails" [] emails-handler)
-    (POST "/magic/request" [] magic-request-handler)
-    (POST "/magic/auth" [] magic-auth-handler)
+           (POST "/emails" [] emails-handler)
+           (POST "/magic/request" [] magic-request-handler)
+           (POST "/magic/auth" [] magic-auth-handler)
 
-    (GET "/me/schedule" [] schedule-handler)
-    (POST "/me/invite-user" [] invite-user-handler)
-    (POST "/me/delete-account" [] delete-account-handler)
-    (POST "/me/checkout/create-session" [] create-session-handler)
-    (POST "/me/checkout/cancel-subscription" [] cancel-subscription-handler)))
+           (GET "/me/schedule" [] schedule-handler)
+           (POST "/me/invite-user" [] invite-user-handler)
+           (POST "/me/delete-account" [] delete-account-handler)
+           (POST "/me/checkout/create-session" [] create-session-handler)
+           (POST "/me/checkout/cancel-subscription" [] cancel-subscription-handler)))
+
 
 (defroutes
   static-routes
   (resources "/" {:root (profile/get-config :static-root)})
   (GET "*" [] (render-static-file "index.html")))
 
-(defn -main []
+
+(defn -main
+  []
   (Thread/setDefaultUncaughtExceptionHandler
     (reify Thread$UncaughtExceptionHandler
-      (uncaughtException [_ thread e]
+      (uncaughtException
+        [_ thread e]
         (log/error e "Uncaught exception on" (.getName thread)))))
   (db/init)
   (set! (. Stripe -apiKey) (profile/get-secret :stripe :secret-key))
