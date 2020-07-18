@@ -392,7 +392,7 @@
 ;; ------------------------------------------------------------------------------
 ;; emails-handler
 
-(defn verify-sender [{:keys [token timestamp signature] :as params}]
+(defn verify-sender [{:keys [token timestamp signature] :as _params}]
   (mac/verify
     (str timestamp token)
     (codecs/hex->bytes signature)
@@ -401,10 +401,8 @@
 
 (defn emails-handler
   [{:keys [params] :as _req}]
-  (fut-bg
-    (log/infof "[verifying] %s %s"
-               (verify-sender params)
-               params))
+  (assert (verify-sender params)
+          (format "Could not verify message came from mailgun %s" params))
   (fut-bg
     (let [{:keys [recipient sender] :as data}
           (-> params
