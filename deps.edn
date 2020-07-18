@@ -10,7 +10,8 @@
         ring/ring {:mvn/version "1.8.0"}
         ring/ring-json {:mvn/version "0.5.0"}
         markdown-clj {:mvn/version "1.10.4"}
-        com.stripe/stripe-java {:mvn/version "19.27.0"}}
+        com.stripe/stripe-java {:mvn/version "19.27.0"}
+        buddy/buddy-core {:mvn/version "1.6.0"}}
  :aliases {:socket
            {:jvm-opts ["-Dclojure.server.repl={:port,50505,:accept,clojure.core.server/repl}"]}
            :uberjar

@@ -18,7 +18,9 @@
     [ring.middleware.keyword-params :refer [wrap-keyword-params]]
     [ring.middleware.params :refer [wrap-params]]
     [ring.util.request :refer [body-string]]
-    [ring.util.response :as resp :refer [response bad-request]])
+    [ring.util.response :as resp :refer [response bad-request]]
+    [buddy.core.mac :as mac]
+    [buddy.core.codecs :as codecs])
   (:import
     (com.google.firebase.database
       DatabaseException)
@@ -289,6 +291,7 @@
    (str
      "<p>" email " just used a magic code. Here's what it says:</p>"
      "<pre><code>" magic "</code></pre>")})
+
 ;; ------------------------------------------------------------------------------
 ;; Outgoing Mail
 
@@ -389,8 +392,19 @@
 ;; ------------------------------------------------------------------------------
 ;; emails-handler
 
+(defn verify-sender [{:keys [token timestamp signature] :as params}]
+  (mac/verify
+    (str timestamp token)
+    (codecs/hex->bytes signature)
+    {:key (profile/get-secret :mailgun :api-key)
+     :alg :hmac+sha256}))
+
 (defn emails-handler
   [{:keys [params] :as _req}]
+  (fut-bg
+    (log/infof "[verifying] %s %s"
+               (verify-sender params)
+               params))
   (fut-bg
     (let [{:keys [recipient sender] :as data}
           (-> params
