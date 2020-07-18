@@ -1,3 +1,3 @@
 # journal-together
 
-# https://www.journaltogether.com
+https://www.journaltogether.com
