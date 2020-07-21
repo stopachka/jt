@@ -92,6 +92,9 @@ function FullScreenSpin({ message }) {
   );
 }
 
+// ----
+// Pages
+
 class SignIn extends React.Component {
   constructor(props) {
     super(props);
