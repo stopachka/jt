@@ -53,11 +53,27 @@ function serverPath(part) {
   return `${root}/${part}`;
 }
 
-function jsonFetch(path, opts) {
-  fetch(path, {
+function jsonFetch(path, opts = {}) {
+  return fetch(path, {
     ...opts,
     headers: { "Content-Type": "application/json", ...opts.headers },
   }).then((x) => (x.status === 200 ? x.json() : Promise.reject(x.json())));
+}
+
+// ----
+// Firebase Helpers
+
+function listenToLoginData(cb) {
+  firebase.auth().onIdTokenChanged((user) => {
+    if (!user) return cb(null);
+    user.getIdToken().then(
+      (token) => cb({ uid: user.uid, email: user.email, token }),
+      (err) => {
+        console.error("uh oh, auth failure", err);
+        cb(null);
+      }
+    );
+  });
 }
 
 // ----
@@ -173,7 +189,7 @@ class ProfileHome extends React.Component {
     this._idToGroupRef = {};
     this._userGroupIdsRef = firebase
       .database()
-      .ref(`/users/${firebase.auth().currentUser.uid}/groups`);
+      .ref(`/users/${this.props.loginData.uid}/groups`);
     this._inviteFormRefs = {};
   }
   componentDidMount() {
@@ -193,6 +209,7 @@ class ProfileHome extends React.Component {
         idToGroup: f(idToGroup),
       }));
     };
+
     const onGroup = (snap) => {
       updateGroups((oldGroups) => ({ ...oldGroups, [snap.key]: snap.val() }));
     };
@@ -241,6 +258,7 @@ class ProfileHome extends React.Component {
   }
 
   render() {
+    const { loginData } = this.props;
     const {
       idToGroup,
       isLoadingGroups,
@@ -308,7 +326,7 @@ class ProfileHome extends React.Component {
                           ),
                           okText: "Yes, delete this gorup",
                           okType: "danger",
-                          onOk() {
+                          onOk: () => {
                             const userKeysToDelete =
                               (g.users &&
                                 Object.keys(g.users).reduce((res, uk) => {
@@ -355,7 +373,7 @@ class ProfileHome extends React.Component {
                                       ),
                                       okText: "Yes, remove this user",
                                       okType: "danger",
-                                      onOk() {
+                                      onOk: () => {
                                         firebase
                                           .database()
                                           .ref()
@@ -407,7 +425,7 @@ class ProfileHome extends React.Component {
                         );
                         invitationRef
                           .set({
-                            "sender-email": firebase.auth().currentUser.email,
+                            "sender-email": loginData.email,
                             "receiver-email": email,
                             "group-id": k,
                           })
@@ -487,15 +505,13 @@ class ProfileHome extends React.Component {
             onFinish={({ groupName }) => {
               this._createGroupForm.resetFields();
               const groupKey = firebase.database().ref("/groups/").push().key;
-              const uid = firebase.auth().currentUser.uid;
-              const email = firebase.auth().currentUser.email;
               firebase
                 .database()
                 .ref()
                 .update({
                   [`/groups/${groupKey}/name`]: groupName,
-                  [`/groups/${groupKey}/users/${uid}/email`]: email,
-                  [`/users/${uid}/groups/${groupKey}`]: true,
+                  [`/groups/${groupKey}/users/${loginData.uid}/email`]: loginData.email,
+                  [`/users/${loginData.uid}/groups/${groupKey}`]: true,
                 });
             }}
           >
@@ -542,41 +558,39 @@ class JournalsComp extends React.Component {
     };
   }
   componentDidMount() {
-    firebase
-      .database()
-      .ref(`/users/${firebase.auth().currentUser.uid}/level`)
-      .on(
-        "value",
-        (snap) => this.setState({ isLoadingLevel: false, level: snap.val() }),
-        (err) => {
-          message.error("Uh oh, we could not access your journals.");
-        }
-      );
-    firebase
-      .database()
-      .ref(`/entries/${firebase.auth().currentUser.uid}/`)
-      .on(
-        "value",
-        (snap) => {
-          this.setState({
-            journals: snap.val(),
-            isLoadingJournals: false,
-          });
-        },
-        (err) => {
-          message.error("Uh oh, we could not access your journals.");
-        }
-      );
+    const { loginData } = this.props;
+    this._levelRef = firebase.database().ref(`/users/${loginData.uid}/level`);
+    this._levelRef.on(
+      "value",
+      (snap) => this.setState({ isLoadingLevel: false, level: snap.val() }),
+      (err) => {
+        message.error("Uh oh, we could not access your journals.");
+      }
+    );
+    this._entriesRef = firebase.database().ref(`/entries/${loginData.uid}/`);
+
+    this._entriesRef.on(
+      "value",
+      (snap) => {
+        this.setState({
+          journals: snap.val(),
+          isLoadingJournals: false,
+        });
+      },
+      (err) => {
+        message.error("Uh oh, we could not access your journals.");
+      }
+    );
+  }
+
+  componentWillUnmount() {
+    this._levelRef.off();
+    this._entriesRef.off();
   }
 
   render() {
-    const {
-      isLoadingJournals,
-      isLoadingLevel,
-
-      journals,
-      level,
-    } = this.state;
+    const { loginData } = this.props;
+    const { isLoadingJournals, isLoadingLevel, journals, level } = this.state;
     if (isLoadingJournals) {
       return <FullScreenSpin />;
     }
@@ -628,12 +642,10 @@ class JournalsComp extends React.Component {
                         ),
                         okText: "Yes, delete this entry",
                         okType: "danger",
-                        onOk() {
+                        onOk: () => {
                           firebase
                             .database()
-                            .ref(
-                              `/entries/${firebase.auth().currentUser.uid}/${k}`
-                            )
+                            .ref(`/entries/${loginData.uid}/${k}`)
                             .set(null)
                             .catch((e) => {
                               message.error(
@@ -695,20 +707,25 @@ class AccountComp extends React.Component {
     };
   }
   componentDidMount() {
-    firebase
+    this._levelRef = firebase
       .database()
-      .ref(`/users/${firebase.auth().currentUser.uid}/level`)
-      .on(
-        "value",
-        (snap) => this.setState({ isLoading: false, level: snap.val() }),
-        (err) => {
-          message.error(
-            "Uh no, failed to fetch your data. Sorry about that :("
-          );
-        }
-      );
+      .ref(`/users/${this.props.loginData.uid}/level`);
+
+    this._levelRef.on(
+      "value",
+      (snap) => this.setState({ isLoading: false, level: snap.val() }),
+      (err) => {
+        message.error("Uh no, failed to fetch your data. Sorry about that :(");
+      }
+    );
   }
+
+  componentWillUnmount() {
+    this._levelRef.off();
+  }
+
   render() {
+    const { loginData } = this.props;
     const { isLoading, isUpgrading, isExporting, level } = this.state;
     if (isLoading) {
       return <FullScreenSpin />;
@@ -754,26 +771,20 @@ class AccountComp extends React.Component {
                       ),
                       okText: "Yes, cancel my subscription",
                       okType: "danger",
-                      onOk() {
-                        firebase
-                          .auth()
-                          .currentUser.getIdToken()
-                          .then((token) => {
-                            return jsonFetch(
-                              serverPath("api/me/checkout/cancel-subscription"),
-                              {
-                                method: "POST",
-                                headers: {
-                                  token,
-                                },
-                              }
-                            );
-                          })
-                          .catch((e) => {
-                            message.error(
-                              "Oh no, something broke. We'll be on this as fast as possible. Please try again"
-                            );
-                          });
+                      onOk: () => {
+                        return jsonFetch(
+                          serverPath("api/me/checkout/cancel-subscription"),
+                          {
+                            method: "POST",
+                            headers: {
+                              token: this.props.loginData.token,
+                            },
+                          }
+                        ).catch((e) => {
+                          message.error(
+                            "Oh no, something broke. We'll be on this as fast as possible. Please try again"
+                          );
+                        });
                       },
                     });
                   }}
@@ -796,20 +807,15 @@ class AccountComp extends React.Component {
                   loading={isUpgrading}
                   onClick={() => {
                     this.setState({ isUpgrading: true });
-                    const sessionPromise = firebase
-                      .auth()
-                      .currentUser.getIdToken()
-                      .then((token) => {
-                        return jsonFetch(
-                          serverPath("api/me/checkout/create-session"),
-                          {
-                            method: "POST",
-                            headers: {
-                              token: token,
-                            },
-                          }
-                        );
-                      });
+                    const sessionPromise = jsonFetch(
+                      serverPath("api/me/checkout/create-session"),
+                      {
+                        method: "POST",
+                        headers: {
+                          token: this.props.loginData.token,
+                        },
+                      }
+                    );
                     Promise.all([STRIPE_PROMISE, sessionPromise]).then(
                       ([stripe, session]) => {
                         this.setState({ isUpgrading: false });
@@ -863,12 +869,12 @@ class AccountComp extends React.Component {
               this.setState({ isExporting: true });
               firebase
                 .database()
-                .ref(`/entries/${firebase.auth().currentUser.uid}/`)
+                .ref(`/entries/${loginData.uid}/`)
                 .once(
                   "value",
                   (snap) => {
                     this.setState({ isExporting: false });
-                    const data = Object.values(snap.val())
+                    const data = Object.values(snap.val() || {})
                       .sort((x) => new Date(x["date"]))
                       .map((x) => ({
                         date: x["date"],
@@ -913,24 +919,18 @@ class AccountComp extends React.Component {
                 ),
                 okText: "Yes, delete my account",
                 okType: "danger",
-                onOk() {
-                  return firebase
-                    .auth()
-                    .currentUser.getIdToken()
-                    .then((token) => {
-                      return jsonFetch(serverPath("api/me/delete-account"), {
-                        method: "POST",
-                        headers: {
-                          token: token,
-                        },
-                      });
-                    })
-                    .then(() => {
-                      firebase.auth().signOut();
-                      message.info(
-                        "Your account has been deleted. Thank you for giving us a shot"
-                      );
-                    });
+                onOk: () => {
+                  return jsonFetch(serverPath("api/me/delete-account"), {
+                    method: "POST",
+                    headers: {
+                      token: this.props.loginData.token,
+                    },
+                  }).then(() => {
+                    firebase.auth().signOut();
+                    message.info(
+                      "Your account has been deleted. Thank you for giving us a shot"
+                    );
+                  });
                 },
               });
             }}
@@ -950,7 +950,7 @@ class MeComp extends React.Component {
     super(props);
     this.state = {
       isLoading: true,
-      isLoggedIn: null,
+      loginData: null,
     };
   }
 
@@ -963,21 +963,20 @@ class MeComp extends React.Component {
         "Welcome to Journal Together premium! We are happy to have you"
       );
     }
-    window.signOut = () => firebase.auth().signOut();
-    firebase.auth().onAuthStateChanged((user) => {
+    listenToLoginData((loginData) => {
       this.setState({
         isLoading: false,
-        isLoggedIn: user,
+        loginData,
       });
     });
   }
 
   render() {
-    const { isLoading, isLoggedIn } = this.state;
+    const { isLoading, loginData } = this.state;
     if (isLoading) {
       return <FullScreenSpin />;
     }
-    if (!isLoggedIn || !firebase.auth().currentUser) {
+    if (!loginData) {
       return <SignIn />;
     }
     return (
@@ -1009,13 +1008,13 @@ class MeComp extends React.Component {
         </div>
         <Switch>
           <Route path="/me/journals">
-            <Journals />
+            <Journals loginData={loginData} />
           </Route>
           <Route path="/me/account">
-            <Account />
+            <Account loginData={loginData} />
           </Route>
           <Route path="/me">
-            <ProfileHome />
+            <ProfileHome loginData={loginData} />
           </Route>
         </Switch>
       </div>
