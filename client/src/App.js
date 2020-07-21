@@ -691,6 +691,7 @@ class AccountComp extends React.Component {
     this.state = {
       isLoading: true,
       isUpgrading: false,
+      isExporting: false,
       level: null,
     };
   }
@@ -709,7 +710,7 @@ class AccountComp extends React.Component {
       );
   }
   render() {
-    const { isLoading, isUpgrading, level } = this.state;
+    const { isLoading, isUpgrading, isExporting, level } = this.state;
     if (isLoading) {
       return <FullScreenSpin />;
     }
@@ -859,6 +860,49 @@ class AccountComp extends React.Component {
             }}
           >
             Sign out
+          </Button>
+        </div>
+        <div className="Account-delete-container">
+          <h2 className="Account-delete-title">Export your journals</h2>
+          <p className="Account-delete-content">
+            Want to back up your data? Click the button below and you'll get a
+            file with all of your journal entries.
+          </p>
+          <Button
+            size="large"
+            type="default"
+            loading={isExporting}
+            onClick={(e) => {
+              this.setState({ isExporting: true });
+              firebase
+                .database()
+                .ref(`/entries/${firebase.auth().currentUser.uid}/`)
+                .once(
+                  "value",
+                  (snap) => {
+                    this.setState({isExporting: false});
+                    const data = Object.values(snap.val())
+                      .sort((x) => new Date(x["date"]))
+                      .map((x) => ({
+                        date: x["date"],
+                        "stripped-text": x["stripped-text"],
+                      }));
+                    const blob = new Blob([JSON.stringify(data, null, 2)], {
+                      type: "application/json",
+                    });
+                    const url = URL.createObjectURL(blob);
+                    window.location = url;
+                  },
+                  () => {
+                    this.setState({ isExporting: false });
+                    message.error(
+                      "Uh oh, we had trouble exporting your data. Please try again"
+                    );
+                  }
+                );
+            }}
+          >
+            Export my journals
           </Button>
         </div>
         <div className="Account-delete-container">
