@@ -475,18 +475,18 @@
 
 (defn invite-user-handler
   [{:keys [body] :as _req}]
-  (let [{:keys [invitation-id]} body]
-    (let [{:keys [sender-email receiver-email] :as invitation}
-          (db/get-invitation-by-id invitation-id)
-          _ (log/debugf "invitation %s" invitation)
-          _ (assert invitation (format "Invalid invitation id = %s" invitation-id))
-          _ (assert (email? receiver-email) (format "Invalid email = %s" receiver-email))]
-      (->> {:email receiver-email :invitations [invitation-id]}
-           db/create-magic-code
-           :key
-           (content-group-invitation sender-email receiver-email)
-           send-email)
-      (response {:sent true}))))
+  (let [{:keys [invitation-id]} body
+        {:keys [sender-email receiver-email] :as invitation}
+        (db/get-invitation-by-id invitation-id)
+        _ (log/debugf "invitation %s" invitation)
+        _ (assert invitation (format "Invalid invitation id = %s" invitation-id))
+        _ (assert (email? receiver-email) (format "Invalid email = %s" receiver-email))]
+    (->> {:email receiver-email :invitations [invitation-id]}
+         db/create-magic-code
+         :key
+         (content-group-invitation sender-email receiver-email)
+         send-email)
+    (response {:sent true})))
 
 ;; ------------------------------------------------------------------------------
 ;; account

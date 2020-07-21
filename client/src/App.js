@@ -18,9 +18,12 @@ import summaryImg from "./images/step-summary.png";
 import inviteFriendsImg from "./images/step-invite-friends.png";
 import qs from "qs";
 
-// Set up Firebase
+// ----
+// Initiate Firebase
+
 import "firebase/auth";
 import "firebase/database";
+
 firebase.initializeApp({
   apiKey: "AIzaSyCBl-YAARDZuf0KcTIOTcmUZjynaKC7puc",
   authDomain: "journaltogether.firebaseapp.com",
@@ -32,18 +35,33 @@ firebase.initializeApp({
   measurementId: "G-GYBL76DZQW",
 });
 
-const STRIPE_PK =
+// ----
+// Initiate Stripe
+
+const STRIPE_PROMISE = loadStripe(
   process.env.NODE_ENV === "production"
     ? "pk_live_erHEE5TRgYAlgqMkadDK7zmA"
-    : "pk_test_1iGrM3ZC85K4LbvyaphPMBr6";
+    : "pk_test_1iGrM3ZC85K4LbvyaphPMBr6"
+);
 
-const stripePromise = loadStripe(STRIPE_PK);
+// ----
+// API
 
-function serverPath(path) {
+function serverPath(part) {
   const root =
     process.env.NODE_ENV === "development" ? "http://localhost:8080" : "";
-  return `${root}/${path}`;
+  return `${root}/${part}`;
 }
+
+function jsonFetch(path, opts) {
+  fetch(path, {
+    ...opts,
+    headers: { "Content-Type": "application/json", ...opts.headers },
+  }).then((x) => (x.status === 200 ? x.json() : Promise.reject(x.json())));
+}
+
+// ----
+// Helper Components
 
 function FullScreenSpin({ message }) {
   return (
@@ -98,22 +116,17 @@ class SignIn extends React.Component {
             <Form
               onFinish={({ email }) => {
                 this.setState({ hasRequestedCode: true });
-                fetch(serverPath("api/magic/request"), {
+                jsonFetch(serverPath("api/magic/request"), {
                   method: "POST",
-                  headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ email }),
-                })
-                  .then((x) =>
-                    x.status === 200 ? x.json() : Promise.reject(x.json())
-                  )
-                  .catch(() => {
-                    message.error(
-                      "Oh no, something broke. Please try sending the magic link again"
-                    );
-                    this.setState({
-                      hasRequestedCode: false,
-                    });
+                }).catch(() => {
+                  message.error(
+                    "Oh no, something broke. Please try sending the magic link again"
+                  );
+                  this.setState({
+                    hasRequestedCode: false,
                   });
+                });
               }}
             >
               <Form.Item
@@ -164,14 +177,7 @@ class ProfileHome extends React.Component {
     this._inviteFormRefs = {};
   }
   componentDidMount() {
-    fetch(serverPath("api/me/schedule"), {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    })
-      .then((x) => {
-        return x.status === 200 ? x.json() : Promise.reject(x.json());
-      })
+    jsonFetch(serverPath("api/me/schedule"))
       .then((schedule) => {
         this.setState({ schedule, isLoadingSchedule: false });
       })
@@ -406,18 +412,11 @@ class ProfileHome extends React.Component {
                             "group-id": k,
                           })
                           .then(() => {
-                            fetch(serverPath("api/me/invite-user"), {
+                            return jsonFetch(serverPath("api/me/invite-user"), {
                               method: "POST",
-                              headers: {
-                                "Content-Type": "application/json",
-                              },
                               body: JSON.stringify({
                                 "invitation-id": invitationRef.key,
                               }),
-                            }).then((x) => {
-                              return x.status === 200
-                                ? x.json()
-                                : Promise.reject(x.json());
                             });
                           })
                           .catch(() => {
@@ -760,21 +759,15 @@ class AccountComp extends React.Component {
                           .auth()
                           .currentUser.getIdToken()
                           .then((token) => {
-                            return fetch(
+                            return jsonFetch(
                               serverPath("api/me/checkout/cancel-subscription"),
                               {
                                 method: "POST",
                                 headers: {
-                                  "Content-Type": "application/json",
-                                  token: token,
+                                  token,
                                 },
                               }
                             );
-                          })
-                          .then((x) => {
-                            return x.status === 200
-                              ? x.json()
-                              : Promise.reject(x.json());
                           })
                           .catch((e) => {
                             message.error(
@@ -807,23 +800,17 @@ class AccountComp extends React.Component {
                       .auth()
                       .currentUser.getIdToken()
                       .then((token) => {
-                        return fetch(
+                        return jsonFetch(
                           serverPath("api/me/checkout/create-session"),
                           {
                             method: "POST",
                             headers: {
-                              "Content-Type": "application/json",
                               token: token,
                             },
                           }
                         );
-                      })
-                      .then((x) => {
-                        return x.status === 200
-                          ? x.json()
-                          : Promise.reject(x.json());
                       });
-                    Promise.all([stripePromise, sessionPromise]).then(
+                    Promise.all([STRIPE_PROMISE, sessionPromise]).then(
                       ([stripe, session]) => {
                         this.setState({ isUpgrading: false });
                         stripe.redirectToCheckout({
@@ -880,7 +867,7 @@ class AccountComp extends React.Component {
                 .once(
                   "value",
                   (snap) => {
-                    this.setState({isExporting: false});
+                    this.setState({ isExporting: false });
                     const data = Object.values(snap.val())
                       .sort((x) => new Date(x["date"]))
                       .map((x) => ({
@@ -931,22 +918,18 @@ class AccountComp extends React.Component {
                     .auth()
                     .currentUser.getIdToken()
                     .then((token) => {
-                      return fetch(serverPath("api/me/delete-account"), {
+                      return jsonFetch(serverPath("api/me/delete-account"), {
                         method: "POST",
                         headers: {
-                          "Content-Type": "application/json",
                           token: token,
                         },
                       });
                     })
-                    .then((x) => {
+                    .then(() => {
                       firebase.auth().signOut();
                       message.info(
                         "Your account has been deleted. Thank you for giving us a shot"
                       );
-                      return x.status === 200
-                        ? x.json()
-                        : Promise.reject(x.json());
                     });
                 },
               });
@@ -1053,12 +1036,10 @@ class MagicAuthComp extends React.Component {
 
   componentDidMount() {
     const { code } = this.props.match.params;
-    fetch(serverPath("api/magic/auth"), {
+    jsonFetch(serverPath("api/magic/auth"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code }),
     })
-      .then((x) => (x.status === 200 ? x.json() : Promise.reject("uh oh")))
       .then(({ token }) => firebase.auth().signInWithCustomToken(token))
       .then(
         () => {
@@ -1074,7 +1055,7 @@ class MagicAuthComp extends React.Component {
   }
 
   render() {
-    const { isLoading, errorMessage } = this.state;
+    const { isLoading } = this.state;
     if (isLoading) {
       return <FullScreenSpin message="Signing in..." />;
     }
