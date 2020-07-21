@@ -312,12 +312,15 @@
       nil)))
 
 
+(def disable-reminder-emails #{"corinna.kester@gmail.com"})
+
 (defn handle-reminder
   [_]
   (let [day (pst-now)
         task-id (str "send-reminder-" (->numeric-date-str day))]
     (when (try-grab-task task-id)
       (->> (db/get-all-users)
+           (filter (comp not disable-reminder-emails :email))
            (pmap (fn [{:keys [email] :as user}]
                    (try
                      (send-email (content-hows-your-day? day email))
