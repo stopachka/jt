@@ -494,11 +494,10 @@
 (defn delete-account-handler
   [{:keys [headers] :as _req}]
   (let [{:keys [uid] :as _user} (db/get-user-from-id-token (get headers "token"))]
-    (do
-      (db/delete-group-memberships uid)
-      (db/delete-payment-info uid)
-      (db/delete-entries uid)
-      (db/delete-user uid))
+    (db/delete-group-memberships uid)
+    (db/delete-payment-info uid)
+    (db/delete-entries uid)
+    (db/delete-user uid)
     (response {:receive true})))
 
 ;; ------------------------------------------------------------------------------
