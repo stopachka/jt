@@ -1,6 +1,8 @@
 (ns jt.core
   (:gen-class)
   (:require
+    [buddy.core.codecs :as codecs]
+    [buddy.core.mac :as mac]
     [chime.core :as chime-core]
     [clojure.string :as str]
     [clojure.tools.logging :as log]
@@ -18,9 +20,7 @@
     [ring.middleware.keyword-params :refer [wrap-keyword-params]]
     [ring.middleware.params :refer [wrap-params]]
     [ring.util.request :refer [body-string]]
-    [ring.util.response :as resp :refer [response bad-request]]
-    [buddy.core.mac :as mac]
-    [buddy.core.codecs :as codecs])
+    [ring.util.response :as resp :refer [response bad-request]])
   (:import
     (com.google.firebase.database
       DatabaseException)
@@ -392,12 +392,14 @@
 ;; ------------------------------------------------------------------------------
 ;; emails-handler
 
-(defn verify-sender [{:keys [token timestamp signature] :as _params}]
+(defn verify-sender
+  [{:keys [token timestamp signature] :as _params}]
   (mac/verify
     (str timestamp token)
     (codecs/hex->bytes signature)
     {:key (profile/get-secret :mailgun :api-key)
      :alg :hmac+sha256}))
+
 
 (defn emails-handler
   [{:keys [params] :as _req}]
