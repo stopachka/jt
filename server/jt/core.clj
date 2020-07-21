@@ -256,7 +256,7 @@
 
 
 (defn content-group-invitation
-  [sender-email receiver-email magic-code]
+  [sender-email receiver-email magic-code message]
   {:from signup-email-with-name
    :to receiver-email
    :subject "You've been invited to join a group on Journal Together"
@@ -264,7 +264,10 @@
    (str
      "<p>Howdy,</p>"
      "<p>" sender-email " has invited you to join their group on Journal Together.</p>"
-     "<p>If you don't know what this is about, please ask em : )</p>"
+     (if (seq message)
+       (str "<p>This is what they said:</p>"
+            "<p>" message "</p>")
+       "<p>If you don't know what this is about, please ask em : )</p>")
      "<p>To get started, open this link:</p>"
      "<p><strong>" (url-with-magic-code magic-code) "</strong></p>")})
 
@@ -477,7 +480,8 @@
 
 (defn invite-users-handler
   [{:keys [body] :as _req}]
-  (let [get-and-validate-invitation
+  (let [{:keys [invitation-ids message]} body
+        get-and-validate-invitation
         (fn [id]
           (let [{:keys [receiver-email] :as invitation}
                 (db/get-invitation-by-id id)
@@ -486,13 +490,12 @@
             [id invitation]))
         send-invitation
         (fn [[id {:keys [receiver-email sender-email]}]]
-          (->> {:email receiver-email :invitations [id]}
-               db/create-magic-code
-               :key
-               (content-group-invitation sender-email receiver-email)
-               send-email))]
-    (->> body
-         :invitation-ids
+          (let [magic-code-key (->> {:email receiver-email :invitations [id]}
+                                    db/create-magic-code
+                                    :key)]
+            (send-email
+              (content-group-invitation sender-email receiver-email magic-code-key message))))]
+    (->> invitation-ids
          (pmap get-and-validate-invitation)
          (pmap send-invitation)
          doall)

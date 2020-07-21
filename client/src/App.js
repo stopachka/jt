@@ -281,6 +281,7 @@ class ProfileHome extends React.Component {
       return <FullScreenSpin />;
     }
     const groupEntries = Object.entries(idToGroup || {});
+    
     return (
       <div className="Profile-container">
         {schedule && schedule["reminder-ms"] && (
@@ -415,28 +416,33 @@ class ProfileHome extends React.Component {
                     <h4 className="Profile-group-invite-user-title">
                       Invite your friends
                     </h4>
-                    <p className="Profile-grop-invite-user-content">
-                      Want to add friends to {g.name}? Give us their email and
+                    <p className="Profile-group-invite-user-content">
+                      Want to add friends to {g.name}? Give us their emails and
                       we'll ask them to join!
                     </p>
                     <Form
+                      layout="vertical"
+                      className="Profile-group-form"
                       ref={(x) => {
                         this._inviteFormRefs[k] = x;
                       }}
-                      onFinish={({ emails }) => {
-                        const emailsArr = emails
+                      onFinish={(data) => {
+                        const emailsArr = data.emails
                           .split(",")
+                          .map((x) => x && x.split(" "))
+                          .flat()
                           .map((x) => x.trim())
                           .filter((x) => x);
-                        
+                        const trimmedMessage = (data.message || "").trim();
+
                         if (!emailsArr.length) {
-                          return
+                          return;
                         }
-                        
+
                         const invalidEmail = emailsArr.find(
                           (x) => !isValidEmail(x)
                         );
-                        
+
                         if (invalidEmail) {
                           message.error(
                             `${invalidEmail} doesn't look like a real email`
@@ -467,6 +473,7 @@ class ProfileHome extends React.Component {
                               method: "POST",
                               body: JSON.stringify({
                                 "invitation-ids": invitiationIds,
+                                message: trimmedMessage,
                               }),
                             });
                           })
@@ -481,22 +488,39 @@ class ProfileHome extends React.Component {
                         );
                       }}
                     >
-                      <Form.Item name="emails">
+                      <Form.Item
+                        name="emails"
+                        rules={[
+                          {
+                            required: true,
+                            message: "Enter your friend's emails",
+                          },
+                        ]}
+                      >
                         <Input
                           className="Profile-group-input"
-                          placeholder="Your friend's email: i.e super-cool-joe@gmail.com"
-                          size="large"
-                          suffix={
-                            <Button
-                              className="Profile-group-submit-btn"
-                              size="large"
-                              type="primary"
-                              htmlType="submit"
-                            >
-                              Invite your friend
-                            </Button>
-                          }
+                          placeholder="i.e joe@gmail.com, marko@gmail.com"
                         />
+                      </Form.Item>
+                      <p className="Profile-group-invite-user-content">
+                        If you like, you can include a special message
+                      </p>
+                      <Form.Item name="message">
+                        <Input
+                          className="Profile-group-input"
+                          placeholder="i.e Hi there, join my group on Journal Together!"
+                          defaultvalue="Hi there, join my group on Journal Together!"
+                        />
+                      </Form.Item>
+                      <Form.Item>
+                        <Button
+                          className="Profile-group-submit-btn"
+                          type="primary"
+                          htmlType="submit"
+                          size="large"
+                        >
+                          Invite your friends
+                        </Button>
                       </Form.Item>
                     </Form>
                   </div>
