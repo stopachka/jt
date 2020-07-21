@@ -230,7 +230,7 @@
    :to to
    :subject subject
    :html (str
-           "<p>Oky doke, I logged this entry!</p>"
+           "<p>Okie dokie, I logged this entry!</p>"
            "<p>To manage your journals, you can always visit https://www.journaltogether.com/me/journals</p>"
            "<p>See ya</p>")})
 

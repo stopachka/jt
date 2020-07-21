@@ -74,11 +74,11 @@ class SignIn extends React.Component {
       return (
         <div className="Sign-in-success-container">
           <div className="Sign-in-success">
-            <h1 className="Sign-in-success-title">📝 journaltogether</h1>
+            <h1 className="Sign-in-success-title">📝 Journal Together</h1>
             <h2 className="Sign-in-success-sub">Check your mail 😊</h2>
             <p className="Sign-in-success-content">
-              Oky doke, you should receive an email from journal-signup. Click
-              the link in there to login
+              Okie dokie, you should receive an email from Journal Signup. Click
+              the link in your inbox to login
             </p>
           </div>
         </div>
@@ -88,7 +88,7 @@ class SignIn extends React.Component {
       <div className="Sign-in-root">
         <div className="Sign-in-header-and-form">
           <div className="Sign-in-header">
-            <h1 className="Sign-in-header-title">📝 journaltogether</h1>
+            <h1 className="Sign-in-header-title">📝 Journal Together</h1>
             <h2 className="Sign-in-header-sub">Let's get you signed in</h2>
             <p className="Sign-in-header-content">
               Enter your email, and you'll receive a magic link to sign in
@@ -397,7 +397,7 @@ class ProfileHome extends React.Component {
                           .push();
 
                         message.success(
-                          "Oky doke, we're sending your friend an invitation!"
+                          "Okie dokie, we're sending your friend an invitation!"
                         );
                         invitationRef
                           .set({
@@ -958,7 +958,7 @@ class MeComp extends React.Component {
         <div className="Me-header">
           <h2 className="Me-header-logo">
             <NavLink className="Me-header-logo-link" to="/me">
-              📝 <span className="Me-header-logo-name">journaltogether</span>
+              📝 <span className="Me-header-logo-name">Journal Together</span>
             </NavLink>
           </h2>
           <div className="Me-header-menu-container">
@@ -1059,7 +1059,7 @@ function HomeComp({ history }) {
       </div>
       <div className="Home-hero">
         <div className="Home-hero-header">
-          <h1 className="Home-hero-title">📝 journaltogether</h1>
+          <h1 className="Home-hero-title">📝 Journal Together</h1>
           <h2 className="Home-hero-sub">
             Keep track of your days and connect with your friends
           </h2>
@@ -1114,7 +1114,7 @@ function HomeComp({ history }) {
       </div>
       <div className="Home-faq-container">
         <div className="Home-faq-header">
-          <h2 className="Home-faq-title">Frequently Asked Questions</h2>
+          <h2 className="Home-faq-title">Frequently asked questions</h2>
         </div>
         <div className="Home-faq-section">
           <h3>Q: How much does this cost?</h3>
