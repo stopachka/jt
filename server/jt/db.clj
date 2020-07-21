@@ -22,9 +22,12 @@
     (com.stripe.model
       Customer)
     (java.time
+      Instant
       ZonedDateTime)
     (java.time.format
-      DateTimeFormatter)))
+      DateTimeFormatter)
+    (java.time.temporal
+      ChronoUnit)))
 
 
 (defprotocol ConvertibleToClojure
@@ -308,19 +311,18 @@
 
 (defn- get-magic-code
   [code]
-  (firebase-fetch (firebase-ref (magic-code-path code))))
+  (some-> (magic-code-path code)
+          firebase-ref
+          firebase-fetch
+          (update :at #(Instant/ofEpochMilli (Long/parseLong %)))))
 
 
-(defn- kill-magic-code
+(defn get-validated-magic-code
   [code]
-  (firebase-save (firebase-ref (magic-code-path code)) nil))
-
-
-(defn consume-magic-code
-  [code]
-  (when-let [res (get-magic-code code)]
-    (kill-magic-code code)
-    res))
+  (let [{:keys [at] :as magic-code} (get-magic-code code)
+        yesterday (.minus (Instant/now) 24 ChronoUnit/HOURS)]
+    (when (and at (.isAfter at yesterday))
+      magic-code)))
 
 ;; ------------------------------------------------------------------------------
 ;; entries
