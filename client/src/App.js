@@ -23,6 +23,7 @@ import qs from "qs";
 
 import "firebase/auth";
 import "firebase/database";
+import "firebase/analytics";
 
 firebase.initializeApp({
   apiKey: "AIzaSyCBl-YAARDZuf0KcTIOTcmUZjynaKC7puc",
