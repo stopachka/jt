@@ -77,6 +77,14 @@ function listenToLoginData(cb) {
 }
 
 // ----
+// Email Helpers
+
+function isValidEmail(email) {
+  const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+  return re.test(String(email).toLowerCase());
+}
+
+// ----
 // Helper Components
 
 function FullScreenSpin({ message }) {
@@ -204,6 +212,7 @@ class ProfileHome extends React.Component {
         message.error(
           "Uh oh, I wasn't able to find your schedule. May be an intermitent bug"
         );
+        this.setState({isLoadingSchedule: false});
       });
     // groups
     const updateGroups = (f) => {
@@ -414,29 +423,42 @@ class ProfileHome extends React.Component {
                       ref={(x) => {
                         this._inviteFormRefs[k] = x;
                       }}
-                      onFinish={({ email }) => {
+                      onFinish={({ emails }) => {
+                        const emailsArr = emails
+                          .split(",")
+                          .map((x) => x.trim())
+                          .filter((x) => x);
+                        const invalidEmail = emailsArr.find(x => !isValidEmail(x));
+                        if (invalidEmail) {
+                          message.error(
+                            `${invalidEmail} doesn't look like a real email`
+                          );
+                          return;
+                        }
+
                         this._inviteFormRefs[k] &&
                           this._inviteFormRefs[k].resetFields();
 
-                        const invitationRef = firebase
-                          .database()
-                          .ref("/invitations")
-                          .push();
-
-                        message.success(
-                          "Okie dokie, we're sending your friend an invitation!"
-                        );
-                        invitationRef
-                          .set({
-                            "sender-email": loginData.email,
-                            "receiver-email": email,
-                            "group-id": k,
+                        Promise.all(
+                          emailsArr.map((email) => {
+                            const invitationRef = firebase
+                              .database()
+                              .ref("/invitations")
+                              .push();
+                            return invitationRef
+                              .set({
+                                "sender-email": loginData.email,
+                                "receiver-email": email,
+                                "group-id": k,
+                              })
+                              .then(() => invitationRef.key);
                           })
-                          .then(() => {
-                            return jsonFetch(serverPath("api/me/invite-user"), {
+                        )
+                          .then((invitiationIds) => {
+                            jsonFetch(serverPath("api/me/invite-users"), {
                               method: "POST",
                               body: JSON.stringify({
-                                "invitation-id": invitationRef.key,
+                                "invitation-ids": invitiationIds,
                               }),
                             });
                           })
@@ -445,10 +467,14 @@ class ProfileHome extends React.Component {
                               "Uh oh, we couldn't send this invitation. Please try again"
                             );
                           });
+
+                        message.success(
+                          "Okie dokie, we're sending your friend an invitation!"
+                        );
                       }}
                     >
                       <Form.Item
-                        name="email"
+                        name="emails"
                         rules={[
                           {
                             required: true,
@@ -460,7 +486,6 @@ class ProfileHome extends React.Component {
                           className="Profile-group-input"
                           placeholder="Your friend's email: i.e super-cool-joe@gmail.com"
                           size="large"
-                          type="email"
                           suffix={
                             <Button
                               className="Profile-group-submit-btn"

@@ -475,19 +475,27 @@
 ;; ------------------------------------------------------------------------------
 ;; invitations
 
-(defn invite-user-handler
+(defn invite-users-handler
   [{:keys [body] :as _req}]
-  (let [{:keys [invitation-id]} body
-        {:keys [sender-email receiver-email] :as invitation}
-        (db/get-invitation-by-id invitation-id)
-        _ (log/debugf "invitation %s" invitation)
-        _ (assert invitation (format "Invalid invitation id = %s" invitation-id))
-        _ (assert (email? receiver-email) (format "Invalid email = %s" receiver-email))]
-    (->> {:email receiver-email :invitations [invitation-id]}
-         db/create-magic-code
-         :key
-         (content-group-invitation sender-email receiver-email)
-         send-email)
+  (let [get-and-validate-invitation
+        (fn [id]
+          (let [{:keys [receiver-email] :as invitation}
+                (db/get-invitation-by-id id)
+                _ (assert invitation (format "Invalid invitation id = %s" id))
+                _ (assert (email? receiver-email) (format "Invalid email = %s" receiver-email))]
+            [id invitation]))
+        send-invitation
+        (fn [[id {:keys [receiver-email sender-email]}]]
+          (->> {:email receiver-email :invitations [id]}
+               db/create-magic-code
+               :key
+               (content-group-invitation sender-email receiver-email)
+               send-email))]
+    (->> body
+         :invitation-ids
+         (pmap get-and-validate-invitation)
+         (pmap send-invitation)
+         doall)
     (response {:sent true})))
 
 ;; ------------------------------------------------------------------------------
@@ -607,7 +615,7 @@
            (POST "/magic/auth" [] magic-auth-handler)
 
            (GET "/me/schedule" [] schedule-handler)
-           (POST "/me/invite-user" [] invite-user-handler)
+           (POST "/me/invite-users" [] invite-users-handler)
            (POST "/me/delete-account" [] delete-account-handler)
            (POST "/me/checkout/create-session" [] create-session-handler)
            (POST "/me/checkout/cancel-subscription" [] cancel-subscription-handler)))
