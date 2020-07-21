@@ -134,14 +134,14 @@
 
 (defn reminder-period
   []
-  (-> (pst-instant 16 0 0)
+  (-> (pst-instant 13 0 0)
       daily-period
       after-now))
 
 
 (defn summary-period
   []
-  (-> (pst-instant 9 0 0)
+  (-> (pst-instant 5 0 0)
       daily-period
       after-now))
 
