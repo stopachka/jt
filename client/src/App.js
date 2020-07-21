@@ -212,7 +212,7 @@ class ProfileHome extends React.Component {
         message.error(
           "Uh oh, I wasn't able to find your schedule. May be an intermitent bug"
         );
-        this.setState({isLoadingSchedule: false});
+        this.setState({ isLoadingSchedule: false });
       });
     // groups
     const updateGroups = (f) => {
@@ -428,7 +428,15 @@ class ProfileHome extends React.Component {
                           .split(",")
                           .map((x) => x.trim())
                           .filter((x) => x);
-                        const invalidEmail = emailsArr.find(x => !isValidEmail(x));
+                        
+                        if (!emailsArr.length) {
+                          return
+                        }
+                        
+                        const invalidEmail = emailsArr.find(
+                          (x) => !isValidEmail(x)
+                        );
+                        
                         if (invalidEmail) {
                           message.error(
                             `${invalidEmail} doesn't look like a real email`
@@ -473,15 +481,7 @@ class ProfileHome extends React.Component {
                         );
                       }}
                     >
-                      <Form.Item
-                        name="emails"
-                        rules={[
-                          {
-                            required: true,
-                            message: "Let us know your friend's email",
-                          },
-                        ]}
-                      >
+                      <Form.Item name="emails">
                         <Input
                           className="Profile-group-input"
                           placeholder="Your friend's email: i.e super-cool-joe@gmail.com"
