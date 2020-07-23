@@ -98,10 +98,12 @@
 (defn send-email
   [content]
   (log/infof "[mail] sending content=%s" content)
-  (mail/send-mail
-    {:key (profile/get-secret :mailgun :api-key)
-     :domain (profile/get-config :mailgun :domain)}
-    content))
+  (if (= profile/env :dev)
+    (log/infof "[mail] skipped send, in dev")
+    (mail/send-mail
+      {:key (profile/get-secret :mailgun :api-key)
+       :domain (profile/get-config :mailgun :domain)}
+      content)))
 
 ;; ------------------------------------------------------------------------------
 ;; Schedule
