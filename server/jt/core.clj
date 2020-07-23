@@ -331,7 +331,7 @@
       (let [all-users (db/get-all-users)
             available-users (filter (comp not disable-reminder-emails :email) all-users)
             _ (log/infof "[reminder] sending reminders to = %s" available-users)]
-        (pmap send-reminder available-users)))))
+        (doall (pmap send-reminder available-users))))))
 
 
 (defn send-summary
