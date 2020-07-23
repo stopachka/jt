@@ -317,10 +317,8 @@
 
 (defn send-reminder
   [day {:keys [email] :as user}]
-  (try
-    (send-email (content-hows-your-day? day email))
-    (catch Exception e
-      (log/errorf e "failed to send reminder for user = %s" user))))
+  (log/infof "sender-reminder: %s" user)
+  (send-email (content-hows-your-day? day email)))
 
 
 (defn handle-reminder
@@ -328,33 +326,32 @@
   (let [day (pst-now)
         task-id (str "send-reminder-" (->numeric-date-str day))]
     (when (try-grab-task task-id)
-      (let [all-users (db/get-all-users)
-            available-users (filter (comp not disable-reminder-emails :email) all-users)
-            _ (log/infof "[reminder] sending reminders to = %s" available-users)]
-        (doall (pmap send-reminder available-users))))))
+      (->> db/get-all-users
+           (filter (comp not disable-reminder-emails :email))
+           (pmap (partial send-reminder day))
+           doall))))
 
 
 (defn send-summary
   [start-date group-id group]
-  (when (try-grab-task (str "summary-group-" group-id (->numeric-date-str start-date)))
-    (let [end-date (.plusDays start-date 1)
-          users (->> group
-                     :users
-                     keys
-                     (map name)
-                     (pmap db/get-user-by-uid))
-          users-with-entries (->> users
-                                  (pmap (fn [{:keys [uid] :as u}]
-                                          [u (db/get-entries-between
-                                               uid start-date end-date)]))
-                                  (filter (comp seq second)))]
-      (cond
-        (not (seq users-with-entries))
-        (log/infof "skipping group, no entries group=%s " group)
+  (let [end-date (.plusDays start-date 1)
+        users (->> group
+                   :users
+                   keys
+                   (map name)
+                   (pmap db/get-user-by-uid))
+        users-with-entries (->> users
+                                (pmap (fn [{:keys [uid] :as u}]
+                                        [u (db/get-entries-between
+                                             uid start-date end-date)]))
+                                (filter (comp seq second)))]
+    (cond
+      (not (seq users-with-entries))
+      (log/infof "skipping group, no entries group=%s " group)
 
-        :else
-        (send-email
-          (content-summary start-date (map :email users) users-with-entries))))))
+      :else
+      (send-email
+        (content-summary start-date (map :email users) users-with-entries)))))
 
 
 (defn handle-summary
