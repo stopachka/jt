@@ -314,18 +314,24 @@
 
 (def disable-reminder-emails #{"corinna.kester@gmail.com"})
 
+
+(defn send-reminder
+  [day {:keys [email] :as user}]
+  (try
+    (send-email (content-hows-your-day? day email))
+    (catch Exception e
+      (log/errorf e "failed to send reminder for user = %s" user))))
+
+
 (defn handle-reminder
   [_]
   (let [day (pst-now)
         task-id (str "send-reminder-" (->numeric-date-str day))]
     (when (try-grab-task task-id)
-      (->> (db/get-all-users)
-           (filter (comp not disable-reminder-emails :email))
-           (pmap (fn [{:keys [email] :as user}]
-                   (try
-                     (send-email (content-hows-your-day? day email))
-                     (catch Exception e
-                       (log/errorf e "failed to send reminder for user = %s" user)))))))))
+      (let [all-users (db/get-all-users)
+            available-users (filter (comp not disable-reminder-emails :email) all-users)
+            _ (log/infof "[reminder] sending reminders to = %s" available-users)]
+        (pmap send-reminder available-users)))))
 
 
 (defn send-summary
@@ -635,26 +641,34 @@
 
 (defn -main
   []
-  (Thread/setDefaultUncaughtExceptionHandler
-    (reify Thread$UncaughtExceptionHandler
-      (uncaughtException
-        [_ thread e]
-        (log/error e "Uncaught exception on" (.getName thread)))))
-  (db/init)
-  (set! (. Stripe -apiKey) (profile/get-secret :stripe :secret-key))
-  (chime-core/chime-at (reminder-period) handle-reminder)
-  (chime-core/chime-at (summary-period) handle-summary)
-  (let [port (profile/get-config :port)
-        app (routes
-              (-> webhook-routes
-                  wrap-json-response)
-              (-> api-routes
-                  wrap-keyword-params
-                  wrap-params
-                  (wrap-json-body {:keywords? true})
-                  wrap-json-response
-                  (wrap-cors :access-control-allow-origin [#".*"]
-                             :access-control-allow-methods [:get :put :post :delete]))
-              static-routes)]
-    (jetty/run-jetty app {:port port}))
-  (log/info "kicked off!"))
+  (let [chime-error-handler (fn [e]
+                              (log/errorf e "[schedule] error running schedule"))]
+    (Thread/setDefaultUncaughtExceptionHandler
+      (reify Thread$UncaughtExceptionHandler
+        (uncaughtException
+          [_ thread e]
+          (log/error e "Uncaught exception on" (.getName thread)))))
+    (db/init)
+    (set! (. Stripe -apiKey) (profile/get-secret :stripe :secret-key))
+    (chime-core/chime-at
+      (reminder-period)
+      handle-reminder
+      {:error-handler chime-error-handler})
+    (chime-core/chime-at
+      (summary-period)
+      handle-summary
+      {:error-handler chime-error-handler})
+    (let [port (profile/get-config :port)
+          app (routes
+                (-> webhook-routes
+                    wrap-json-response)
+                (-> api-routes
+                    wrap-keyword-params
+                    wrap-params
+                    (wrap-json-body {:keywords? true})
+                    wrap-json-response
+                    (wrap-cors :access-control-allow-origin [#".*"]
+                               :access-control-allow-methods [:get :put :post :delete]))
+                static-routes)]
+      (jetty/run-jetty app {:port port}))
+    (log/info "kicked off!")))
