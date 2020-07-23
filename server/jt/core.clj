@@ -315,20 +315,20 @@
 (def disable-reminder-emails #{"corinna.kester@gmail.com"})
 
 
-(defn send-reminder
-  [day {:keys [email] :as user}]
-  (log/infof "sender-reminder: %s" user)
-  (send-email (content-hows-your-day? day email)))
-
-
 (defn handle-reminder
   [_]
   (let [day (pst-now)
         task-id (str "send-reminder-" (->numeric-date-str day))]
     (when (try-grab-task task-id)
-      (->> db/get-all-users
+      (->> (db/get-all-users)
            (filter (comp not disable-reminder-emails :email))
-           (pmap (partial send-reminder day))
+           (pmap
+             (fn [{:keys [email] :as user}]
+               (try
+                 (log/infof "attempt sender-reminder: %s" user)
+                 (send-email (content-hows-your-day? day email))
+                 (catch Exception e
+                   (log/errorf e "failed send-reminder: %s" user)))))
            doall))))
 
 
