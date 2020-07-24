@@ -314,8 +314,13 @@
       nil)))
 
 
-(def disable-reminder-emails #{"corinna.kester@gmail.com"})
-
+(defn send-reminder?
+  "Some users do not want to receive a reminder email, asking about
+  their day. The use case here, is I think, they simply want to follow
+  along with their friend's journals. I am not sure about this UX, but
+  supporting it for the few folks who asked for this."
+  [email]
+  (not (contains? (profile/get-secret :emails :reminder-ignore) email)))
 
 (defn handle-reminder
   [_]
@@ -323,7 +328,7 @@
         task-id (str "send-reminder-" (->numeric-date-str day))]
     (when (try-grab-task task-id)
       (->> (db/get-all-users)
-           (filter (comp not disable-reminder-emails :email))
+           (filter (comp send-reminder? :email))
            (pmap
              (fn [{:keys [email] :as user}]
                (try
@@ -387,6 +392,14 @@
 ;; ------------------------------------------------------------------------------
 ;; handle-hows-your-day-response
 
+(defn send-ack?
+  "some users do not like to deal with the response to the how's
+  your day email. It puts the message back into their inbox queue.
+  They raise a good point. Right now keeping it, as I am not sure how
+  others feel. Will think about this"
+  [email]
+  (not (contains? (profile/get-secret :emails :ack-ignore) email)))
+
 (defn handle-hows-your-day-response
   [data]
   (let [{:keys [sender recipient subject]} data
@@ -398,7 +411,8 @@
       :else
       (do
         (db/save-entry uid data)
-        (send-email (content-ack-receive sender subject))))))
+        (when (send-ack? sender)
+          (send-email (content-ack-receive sender subject)))))))
 
 ;; ------------------------------------------------------------------------------
 ;; emails-handler
