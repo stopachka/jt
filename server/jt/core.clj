@@ -661,8 +661,7 @@
 ;; ------------------------------------------------------------------------------
 ;; Off- topic: Stopa's other notifications
 
-(defn community-review-period
-  []
+(defn community-review-period []
   (let [now (pst-now)
         first-date-of-the-month
         (.adjustInto (LocalTime/of 8 0 0)
