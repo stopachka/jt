@@ -34,6 +34,7 @@
     (com.stripe.net
       Webhook)
     (java.time
+      DayOfWeek
       Instant
       LocalTime
       Period
@@ -140,7 +141,6 @@
       daily-period
       after-now))
 
-
 (defn summary-period
   []
   (-> (pst-instant 5 0 0)
@@ -148,37 +148,42 @@
       after-now))
 
 ;; ------------------------------------------------------------------------------
-;; Content
+;; Sender
 
-(defn email-with-name
-  [email name]
-  (str name " <" email ">"))
-
-
-(def hows-your-day-email "journal-buddy@mg.journaltogether.com")
-
-
-(def hows-your-day-email-with-name
-  (email-with-name hows-your-day-email "Journal Buddy"))
+(defn create-sender
+  [name email]
+  {:raw-name name
+   :raw-email email
+   :email-with-name (str name " <" email ">")})
 
 
-(def summary-email "journal-summary@mg.journaltogether.com")
+(def hows-your-day-sender
+  (create-sender
+    "Journal Buddy"
+    "journal-buddy@mg.journaltogether.com"))
 
 
-(def summary-email-with-name
-  (email-with-name summary-email "Journal Summary"))
+(def summary-sender
+  (create-sender
+    "Journal Summary"
+    "journal-summary@mg.journaltogether.com"))
 
 
-(def signup-email "sign-up@mg.journaltogether.com")
+(def signup-sender
+  (create-sender
+    "Journal Signup"
+    "sign-up@mg.journaltogether.com"))
 
 
-(def signup-email-with-name
-  (email-with-name signup-email "Journal Signup"))
+(def ceo-assistant-sender
+  (create-sender
+    "CEO Assistant"
+    "ceo-assistant@mg.journaltogether.com"))
 
 
 (defn content-hows-your-day?
   [day email]
-  {:from hows-your-day-email-with-name
+  {:from (:email-with-name hows-your-day-sender)
    :to email
    :subject (str
               (fmt-with-pattern friendly-date-pattern day)
@@ -214,7 +219,7 @@
 (defn content-summary
   [day to users-with-entries]
   (let [friendly-date-str (fmt-with-pattern friendly-date-pattern day)]
-    {:from summary-email-with-name
+    {:from (:email-with-name summary-sender)
      :to to
      :subject (str "☀️ Here's how things went " friendly-date-str)
      :html
@@ -228,7 +233,7 @@
 
 (defn content-ack-receive
   [to, subject]
-  {:from hows-your-day-email-with-name
+  {:from (:email-with-name hows-your-day-sender)
    :to to
    :subject subject
    :html (str
@@ -244,7 +249,7 @@
 
 (defn content-magic-code-response
   [to magic-code]
-  {:from signup-email-with-name
+  {:from (:email-with-name signup-sender)
    :to to
    :subject "Magic sign-in link for Journal Together"
    :html
@@ -259,7 +264,7 @@
 
 (defn content-group-invitation
   [sender-email receiver-email magic-code message]
-  {:from signup-email-with-name
+  {:from (:email-with-name signup-sender)
    :to receiver-email
    :subject "You've been invited to join a group on Journal Together"
    :html
@@ -287,7 +292,7 @@
 
 (defn content-notify-ceo-about-magic
   [{:keys [email] :as magic}]
-  {:from "Journal CEO Assistant <ceo-notifier@mg.journaltogether.com>"
+  {:from (:email-with-name ceo-assistant-sender)
    :to (profile/get-config :ceo-email)
    :subject (str "New magic usage by " (-> email
                                            (str/split #"@")
@@ -321,6 +326,7 @@
   supporting it for the few folks who asked for this."
   [email]
   (not (contains? (profile/get-secret :emails :reminder-ignore) email)))
+
 
 (defn handle-reminder
   [_]
@@ -400,6 +406,7 @@
   [email]
   (not (contains? (profile/get-secret :emails :ack-ignore) email)))
 
+
 (defn handle-hows-your-day-response
   [data]
   (let [{:keys [sender recipient subject]} data
@@ -435,7 +442,7 @@
           (-> params
               (assoc :date (parse-email-date params)))]
       (condp = recipient
-        hows-your-day-email
+        (:raw-email hows-your-day-sender)
         (handle-hows-your-day-response data)
 
         (log/infof "skipping for recipient=%s sender=%s" recipient sender))))
@@ -651,6 +658,57 @@
   (resources "/" {:root (profile/get-config :static-root)})
   (GET "*" [] (render-static-file "index.html")))
 
+;; ------------------------------------------------------------------------------
+;; Off- topic: Stopa's other notifications
+
+(defn community-review-period
+  []
+  (let [now (pst-now)
+        first-date-of-the-month
+        (.adjustInto (LocalTime/of 8 0 0)
+                     (.withDayOfMonth now 1))
+        period (chime-core/periodic-seq
+                 first-date-of-the-month
+                 (Period/ofDays 1))
+        friday? (comp #{DayOfWeek/FRIDAY}
+                      #(.getDayOfWeek %))
+        month #(.getMonth %)
+        take-every-other (partial take-nth 2)]
+    (->> period
+         (filter friday?)
+         (partition-by month)
+         (mapcat take-every-other)
+         (filter #(.isAfter % now)))))
+
+
+(defn content-review-community
+  "Doing a small test, where I get a 1 / 3 week notification, asking me to
+   review how my community is doing."
+  []
+  {:from "Community Assistant <community-assistant@mg.journaltogether.com>"
+   :to (profile/get-secret :emails :ceo)
+   :subject "Hey Stopa, how's the community doing?"
+   :html
+   (str
+     "<p>Howdy :)</p>"
+     "<p>How has your community been? Let's engage, help, share in the journey of life -- that's what it's all about at the end of the day.</p>"
+     "<p>"
+     "1. Open this "
+     "<a href=\"" (profile/get-secret :crm :execution-link) "\">" "execution doc" "</a>"
+     "</p>"
+     "<p>"
+     "2. And this "
+     "<a href=\"" (profile/get-secret :crm :database-link) "\">" "community sheet" "</a>"
+     "</p>"
+     "<p>Then get rollin!</p>")})
+
+
+(defn handle-community-review
+  [_]
+  (send-email (content-review-community)))
+
+;; ------------------------------------------------------------------------------
+;; Main
 
 (defn -main
   []
@@ -670,6 +728,10 @@
     (chime-core/chime-at
       (summary-period)
       handle-summary
+      {:error-handler chime-error-handler})
+    (chime-core/chime-at
+      (community-review-period)
+      handle-community-review
       {:error-handler chime-error-handler})
     (let [port (profile/get-config :port)
           app (routes
