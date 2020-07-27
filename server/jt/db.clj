@@ -214,6 +214,32 @@
     (name level)))
 
 ;; ------------------------------------------------------------------------------
+;; time-prefs
+
+(def time-pref-root "/time-prefs")
+
+(defn get-user-ids-by-time-pref
+  "Gets all the user that have a certain time pref.
+  i.e [:send-reminder 8]
+  Returns all users who want a reminder at 8am"
+  [k h]
+  (let [time-prefs (-> (FirebaseDatabase/getInstance)
+                       (.getReference "/time-prefs")
+                       (.orderByChild (name k))
+                       (.equalTo (* 1.0 h))
+                       firebase-fetch
+                       keys)]
+    (map name time-prefs)))
+
+(defn get-users-by-time-pref [k h]
+  (pmap
+    get-user-by-uid
+    (get-user-ids-by-time-pref k h)))
+
+(defn get-groups-by-time-pref [k h]
+  (pmap
+    (get-group-by-)))
+;; ------------------------------------------------------------------------------
 ;; groups
 
 (def group-root "/groups/")
