@@ -391,13 +391,13 @@
         hour (.getHour (pst-now))
         task-id (str "send-reminder-" hour "-" (->numeric-date-str date))]
     (when (try-grab-task task-id)
-      (->> (db/get-users-by-time-pref hour)
+      (->> (db/get-users-by-reminder-hour hour)
            (filter (comp send-reminder? :email))
            (pmap
              (fn [{:keys [email] :as user}]
                (try
                  (log/infof "attempt sender-reminder: %s" user)
-                 (send-email (content-hows-your-day? day email))
+                 (send-email (content-hows-your-day? date email))
                  (catch Exception e
                    (log/errorf e "failed send-reminder: %s" user)))))
            doall))))
