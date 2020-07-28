@@ -391,7 +391,7 @@
         hour (.getHour (pst-now))
         task-id (str "send-reminder-" hour "-" (->numeric-date-str date))]
     (when (try-grab-task task-id)
-      (->> (db/get-users-by-time-pref :send-reminder hour)
+      (->> (db/get-users-by-time-pref hour)
            (filter (comp send-reminder? :email))
            (pmap
              (fn [{:keys [email] :as user}]
@@ -400,19 +400,6 @@
                  (send-email (content-hows-your-day? day email))
                  (catch Exception e
                    (log/errorf e "failed send-reminder: %s" user)))))
-           doall))))
-
-(defn handle-summary-2
-  [_]
-  (let [start-date (.minusDays (pst-now) 1)
-        task-id (str "handle-summary-" (->numeric-date-str start-date))]
-    (when (try-grab-task task-id)
-      (->> (db/get-all-groups)
-           (pmap (fn [[k g]]
-                   (try
-                     (send-summary start-date k g)
-                     (catch Exception e
-                       (log/errorf e "failed to send summary to group %s" g)))))
            doall))))
 
 ;; ------------------------------------------------------------------------------
@@ -758,6 +745,10 @@
     (chime-core/chime-at
       (reminder-period)
       handle-reminder
+      {:error-handler chime-error-handler})
+    (chime-core/chime-at
+      (reminder-period)
+      handle-reminder-2
       {:error-handler chime-error-handler})
     (chime-core/chime-at
       (summary-period)

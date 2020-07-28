@@ -12,7 +12,7 @@
     (com.google.firebase.auth
       FirebaseAuth
       FirebaseAuthException
-      UserRecord$CreateRequest)
+      UserRecord$CreateRequest UidIdentifier)
     (com.google.firebase.database
       DatabaseReference
       DatabaseReference$CompletionListener
@@ -184,6 +184,17 @@
              (.getNextPage page))
       ret)))
 
+(defn get-batched-users [user-ids]
+  (letfn [(get-batch [identifiers]
+            (let [user-records (-> (FirebaseAuth/getInstance)
+                                   (.getUsers identifiers)
+                                   .getUsers)]
+              (map user-record->map user-records)))]
+    (->> user-ids
+         (map #(UidIdentifier. %))
+         (partition-all 50)
+         (pmap get-batch)
+         (mapcat identity))))
 
 (defn get-user-by-customer-id
   [customer-id]
@@ -213,32 +224,23 @@
     (firebase-ref (str "/users/" uid "/level/"))
     (name level)))
 
-;; ------------------------------------------------------------------------------
-;; time-prefs
-
-(def time-pref-root "/time-prefs")
-
-(defn get-user-ids-by-time-pref
+(defn get-user-ids-by-reminder-hour
   "Gets all the user that have a certain time pref.
   i.e [:send-reminder 8]
   Returns all users who want a reminder at 8am"
-  [k h]
-  (let [time-prefs (-> (FirebaseDatabase/getInstance)
-                       (.getReference "/time-prefs")
-                       (.orderByChild (name k))
-                       (.equalTo (* 1.0 h))
-                       firebase-fetch
-                       keys)]
-    (map name time-prefs)))
+  [h]
+  (let [user-id-kws
+        (-> (firebase-ref "/users/")
+            (.orderByChild "/reminder-options/send-pst-hour")
+            (.equalTo (* 1.0 h))
+            firebase-fetch
+            keys)]
+    (map name user-id-kws)))
 
-(defn get-users-by-time-pref [k h]
-  (pmap
-    get-user-by-uid
-    (get-user-ids-by-time-pref k h)))
+(defn get-users-by-reminder-hour [h]
+  (get-batched-users
+    (get-user-ids-by-reminder-hour h)))
 
-(defn get-groups-by-time-pref [k h]
-  (pmap
-    (get-group-by-)))
 ;; ------------------------------------------------------------------------------
 ;; groups
 
