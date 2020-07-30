@@ -387,7 +387,7 @@
   [_]
   (let [date (pst-now)
         hour (.getHour (pst-now))
-        task-id (str "send-reminder-" hour "-" (->numeric-date-str date))]
+        task-id (str "send-reminder-2" hour "-" (->numeric-date-str date))]
     (when (try-grab-task task-id)
       (->> (db/get-users-by-reminder-hour hour)
            (filter (comp send-reminder? :email))
