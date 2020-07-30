@@ -805,7 +805,7 @@ class AccountComp extends React.Component {
                   Thank you for supporting us. I appreciate your patronage 😊
                 </p>
                 <p className="Account-memberip-content">
-                  If time has comes to move on from Journal Together though, I
+                  If the time has come to move on from Journal Together though, I
                   completely understand. If you'd like to cancel your
                   subscription, here's a handy button to do that
                 </p>
@@ -954,7 +954,7 @@ class AccountComp extends React.Component {
         <div className="Account-delete-container">
           <h2 className="Account-delete-title">Delete your account</h2>
           <p className="Account-delete-content">
-            If time has come to delete your account, I understand. Thank you for
+            If the time has come to delete your account, I understand. Thank you for
             giving us a shot.
           </p>
           <Button
