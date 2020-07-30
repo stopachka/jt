@@ -282,7 +282,7 @@ class ProfileHome extends React.Component {
       return <FullScreenSpin />;
     }
     const groupEntries = Object.entries(idToGroup || {});
-    
+
     return (
       <div className="Profile-container">
         {schedule && schedule["reminder-ms"] && (
@@ -805,8 +805,8 @@ class AccountComp extends React.Component {
                   Thank you for supporting us. I appreciate your patronage 😊
                 </p>
                 <p className="Account-memberip-content">
-                  If the time has come to move on from Journal Together though, I
-                  completely understand. If you'd like to cancel your
+                  If the time has come to move on from Journal Together though,
+                  I completely understand. If you'd like to cancel your
                   subscription, here's a handy button to do that
                 </p>
                 <Button
@@ -954,8 +954,8 @@ class AccountComp extends React.Component {
         <div className="Account-delete-container">
           <h2 className="Account-delete-title">Delete your account</h2>
           <p className="Account-delete-content">
-            If the time has come to delete your account, I understand. Thank you for
-            giving us a shot.
+            If the time has come to delete your account, I understand. Thank you
+            for giving us a shot.
           </p>
           <Button
             size="large"
