@@ -196,25 +196,21 @@ class ProfileHome extends React.Component {
       isLoadingGroups: true,
       isLoadingSchedule: true,
       idToGroup: {},
-      schedule: null,
+      sendPstHour: null,
     };
     this._idToGroupRef = {};
     this._userGroupIdsRef = firebase
       .database()
       .ref(`/users/${this.props.loginData.uid}/groups`);
+    this._userReminderHourRef = firebase
+      .database()
+      .ref(`/users/${this.props.loginData.uid}/reminder-options/send-pst-hour`);
     this._inviteFormRefs = {};
   }
   componentDidMount() {
-    jsonFetch(serverPath("api/me/schedule"))
-      .then((schedule) => {
-        this.setState({ schedule, isLoadingSchedule: false });
-      })
-      .catch((e) => {
-        message.error(
-          "Uh oh, I wasn't able to find your schedule. May be an intermitent bug"
-        );
-        this.setState({ isLoadingSchedule: false });
-      });
+    this._userReminderHourRef.on('value', (snap) => { 
+      this.setState({sendPstHour: snap.val(), isLoadingSchedule: false})
+    })
     // groups
     const updateGroups = (f) => {
       this.setState(({ idToGroup }) => ({
@@ -276,7 +272,7 @@ class ProfileHome extends React.Component {
       idToGroup,
       isLoadingGroups,
       isLoadingSchedule,
-      schedule,
+      sendPstHour,
     } = this.state;
     if (isLoadingGroups || isLoadingSchedule) {
       return <FullScreenSpin />;
@@ -285,25 +281,17 @@ class ProfileHome extends React.Component {
 
     return (
       <div className="Profile-container">
-        {schedule && schedule["reminder-ms"] && (
+        {sendPstHour != null && (
           <div className="Profile-schedule-container">
             <h2 className="Profile-schedule-title">
               Your next reminder:{" "}
               <span className="Profile-schedule-reminder-date">
-                {new Date(schedule["reminder-ms"]).toLocaleString("en-US", {
-                  weekday: "long",
-                  hour: "numeric",
-                  minute: "numeric",
-                })}
+                {sendPstHour}
               </span>
             </h2>
             <p className="Profile-schedule-desc">
               🙌 Welcome. Watch your email around{" "}
-              {new Date(schedule["reminder-ms"]).toLocaleString("en-US", {
-                weekday: "long",
-                hour: "numeric",
-                minute: "numeric",
-              })}
+              {sendPstHour}
               . You'll receive an email from Journal Buddy, asking about your
               day. We'll record your answers as journal entries. Don't want to
               wait? Simply send an email to{" "}

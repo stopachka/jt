@@ -224,6 +224,11 @@
     (firebase-ref (str "/users/" uid "/level/"))
     (name level)))
 
+(defn save-reminder-hour [uid reminder-hour]
+  (firebase-save
+    (firebase-ref (str "/users/" uid "/reminder-options/send-pst-hour"))
+    reminder-hour))
+
 (defn get-user-ids-by-reminder-hour
   "Gets all the user that have a certain time pref.
   i.e [:send-reminder 8]

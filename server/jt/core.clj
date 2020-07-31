@@ -394,7 +394,7 @@
            (pmap
              (fn [{:keys [email] :as user}]
                (try
-                 (log/infof "attempt sender-reminder: %s" user)
+                 (log/infof "attempt send-reminder: %s" user)
                  (send-email (content-hows-your-day? date email))
                  (catch Exception e
                    (log/errorf e "failed send-reminder: %s" user)))))
