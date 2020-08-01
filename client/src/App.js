@@ -345,7 +345,8 @@ class ProfileHome extends React.Component {
           <div className="Profile-groups-container">
             <h2 className="Profile-groups-title">Your groups</h2>
             {groupEntries.map(([k, g]) => {
-              const summarySendHourPST = g['summary-options'] && g['summary-options']['send-hour-pst'];
+              const summarySendHourPST =
+                g["summary-options"] && g["summary-options"]["send-pst-hour"];
               return (
                 <div className="Profile-group">
                   <div className="Profile-group-header">
@@ -387,25 +388,31 @@ class ProfileHome extends React.Component {
                       Delete Group
                     </Button>
                   </div>
-                  <div>
-                    <h4 className="Profile-schedule-title">
-                      Your next summary:{" "}
-                      <span className="Profile-schedule-reminder-date">
-                        <HourPicker
-                          value={pstHourToLocal(reminderPSTHour)}
-                          onChange={(m) => {
-                            this.setState({
-                              reminderPSTHour: pstHour(moment(m)),
-                            });
-                          }}
-                        />
-                      </span>
-                    </h4>
-                    <p className="Profile-summary-schedule-content">
-                      You'll receive a summary email, with what all your friends
-                      wrote at {pstHourToLocal(reminderPSTHour).format("h a")}
-                    </p>
-                  </div>
+                  {summarySendHourPST != null && (
+                    <div>
+                      <h4 className="Profile-schedule-title">
+                        Your next summary:{" "}
+                        <span className="Profile-schedule-reminder-date">
+                          <HourPicker
+                            value={pstHourToLocal(summarySendHourPST)}
+                            onChange={(m) => {
+                              firebase
+                                .database()
+                                .ref(
+                                  `/groups/${k}/summary-options/send-pst-hour`
+                                )
+                                .set(pstHour(moment(m)));
+                            }}
+                          />
+                        </span>
+                      </h4>
+                      <p className="Profile-summary-schedule-content">
+                        You'll receive a summary email, with what all your
+                        friends wrote at{" "}
+                        {pstHourToLocal(reminderPSTHour).format("h a")}
+                      </p>
+                    </div>
+                  )}
                   <div>
                     {g.users && (
                       <div className="Profile-group-users-container">
@@ -608,6 +615,7 @@ class ProfileHome extends React.Component {
                 .update({
                   [`/groups/${groupKey}/name`]: groupName,
                   [`/groups/${groupKey}/users/${loginData.uid}/email`]: loginData.email,
+                  [`/groups/${groupKey}/summary-options/send-pst-hour`]: 5,
                   [`/users/${loginData.uid}/groups/${groupKey}`]: true,
                 });
             }}
