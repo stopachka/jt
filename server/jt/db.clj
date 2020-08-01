@@ -400,6 +400,27 @@
     nil))
 
 ;; ------------------------------------------------------------------------------
+;; migrations
+
+(defn add-reminder-hour! []
+  (let [us (get-all-users)]
+    (->> us
+         (mapv (fn [{:keys [uid]}]
+                 (firebase-save
+                   (firebase-ref (str "/users/" uid "/reminder-options/send-pst-hour"))
+                   13))))))
+
+(defn add-summary-hour! []
+  (let [gs (get-all-groups)]
+    (->> gs
+         keys
+         (map name)
+         (mapv (fn [gid]
+                 (firebase-save
+                   (firebase-ref (str "/groups/" gid "/summary-options/send-pst-hour"))
+                   5))))))
+
+;; ------------------------------------------------------------------------------
 ;; init
 
 (defn init
