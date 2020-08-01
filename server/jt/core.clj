@@ -218,17 +218,6 @@
           "</em></p>")}))
 
 
-(defn content-ack-receive
-  [to, subject]
-  {:from (:email-with-name hows-your-day-sender)
-   :to to
-   :subject subject
-   :html (str
-           "<p>Okie dokie, I logged this entry!</p>"
-           "<p>To manage your journals, you can always visit https://www.journaltogether.com/me/journals</p>"
-           "<p>See ya</p>")})
-
-
 (defn url-with-magic-code
   [magic-code]
   (str "https://www.journaltogether.com/magic/" magic-code))
@@ -388,15 +377,6 @@
 ;; ------------------------------------------------------------------------------
 ;; handle-hows-your-day-response
 
-(defn send-ack?
-  "some users do not like to deal with the response to the how's
-  your day email. It puts the message back into their inbox queue.
-  They raise a good point. Right now keeping it, as I am not sure how
-  others feel. Will think about this"
-  [email]
-  (not (contains? (profile/get-secret :emails :ack-ignore) email)))
-
-
 (defn handle-hows-your-day-response
   [data]
   (let [{:keys [sender recipient subject]} data
@@ -406,10 +386,7 @@
       (send-email (content-user-does-not-exist recipient sender subject))
 
       :else
-      (do
-        (db/save-entry uid data)
-        (when (send-ack? sender)
-          (send-email (content-ack-receive sender subject)))))))
+      (db/save-entry uid data))))
 
 ;; ------------------------------------------------------------------------------
 ;; emails-handler
