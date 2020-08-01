@@ -280,6 +280,13 @@
                       keys)]
     (map name group-kws)))
 
+(defn get-groups-by-summary-hour
+  "Gets all the groups based on their summary send preference."
+  [h]
+  (-> (firebase-ref "/groups/")
+      (.orderByChild "/summary-options/send-pst-hour")
+      (.equalTo (* 1.0 h))
+      firebase-fetch))
 
 (defn remove-user-from-group
   [uid group-id]

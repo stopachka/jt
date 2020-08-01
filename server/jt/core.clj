@@ -109,11 +109,9 @@
 
 (def pst-zone (ZoneId/of "America/Los_Angeles"))
 
-
 (defn pst-now
   []
   (ZonedDateTime/now pst-zone))
-
 
 (defn pst-instant
   [h m s]
@@ -129,9 +127,21 @@
 
 (defn after-now
   [period]
-  (let [now (Instant/now)]
+  (let [now (pst-now)]
     (filter #(.isAfter % now) period)))
 
+(defn hourly-period []
+  (let [now (pst-now)
+        ->all-hours (fn [date]
+                      (->> (range 24)
+                           (map #(.withHour date %))))
+        adjust-mins-to-five (fn [date]
+                              (.withMinute date 5))
+        after-now? #(.isAfter % now)]
+    (->> (daily-period (pst-now))
+         (mapcat ->all-hours)
+         (map adjust-mins-to-five)
+         (filter after-now?))))
 
 (defn reminder-period
   []
@@ -328,23 +338,24 @@
 
 (defn handle-reminder
   [_]
-  (let [day (pst-now)
-        task-id (str "send-reminder-" (->numeric-date-str day))]
+  (let [now (pst-now)
+        h (.getHour now)
+        task-id (str "send-reminder-" (->numeric-date-str now))]
     (when (try-grab-task task-id)
-      (->> (db/get-all-users)
+      (->> (db/get-users-by-reminder-hour h)
            (filter (comp send-reminder? :email))
            (pmap
              (fn [{:keys [email] :as user}]
                (try
                  (log/infof "attempt sender-reminder: %s" user)
-                 (send-email (content-hows-your-day? day email))
+                 (send-email (content-hows-your-day? now email))
                  (catch Exception e
                    (log/errorf e "failed send-reminder: %s" user)))))
            doall))))
 
 
 (defn send-summary
-  [start-date group-id group]
+  [start-date group]
   (let [end-date (.plusDays start-date 1)
         users (->> group
                    :users
@@ -367,13 +378,15 @@
 
 (defn handle-summary
   [_]
-  (let [start-date (.minusDays (pst-now) 1)
+  (let [now (pst-now)
+        start-date (.minusDays now 1)
+        h (.getHour now)
         task-id (str "handle-summary-" (->numeric-date-str start-date))]
     (when (try-grab-task task-id)
-      (->> (db/get-all-groups)
-           (pmap (fn [[k g]]
+      (->> (db/get-groups-by-summary-hour h)
+           (pmap (fn [[_k g]]
                    (try
-                     (send-summary start-date k g)
+                     (send-summary start-date g)
                      (catch Exception e
                        (log/errorf e "failed to send summary to group %s" g)))))
            doall))))
@@ -731,15 +744,11 @@
     (db/init)
     (set! (. Stripe -apiKey) (profile/get-secret :stripe :secret-key))
     (chime-core/chime-at
-      (reminder-period)
+      (hourly-period)
       handle-reminder
       {:error-handler chime-error-handler})
     (chime-core/chime-at
-      (reminder-period)
-      handle-reminder-2
-      {:error-handler chime-error-handler})
-    (chime-core/chime-at
-      (summary-period)
+      (hourly-period)
       handle-summary
       {:error-handler chime-error-handler})
     (chime-core/chime-at
