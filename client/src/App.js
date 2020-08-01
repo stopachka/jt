@@ -308,11 +308,7 @@ class ProfileHome extends React.Component {
           </h2>
           <p className="Profile-schedule-desc">
             🙌 Welcome. Watch your email around{" "}
-            {moment()
-              .tz("America/Los_Angeles")
-              .hour(reminderPSTHour)
-              .local()
-              .format("h a")}{" "}
+            {pstHourToLocal(reminderPSTHour).format("h a")}
             . You'll receive an email from Journal Buddy, asking about your day.
             We'll record your answers as journal entries. Don't want to wait?
             Simply send an email to{" "}
@@ -370,7 +366,7 @@ class ProfileHome extends React.Component {
                       Delete Group
                     </Button>
                   </div>
-                  <div className="">
+                  <div>
                     <h4 className="Profile-schedule-title">
                       Your next summary:{" "}
                       <span className="Profile-schedule-reminder-date">
@@ -387,11 +383,7 @@ class ProfileHome extends React.Component {
                     <p className="Profile-summary-schedule-content">
                       You'll receive a summary email, with what all your friends
                       wrote at{" "}
-                      {moment()
-                        .tz("America/Los_Angeles")
-                        .hour(reminderPSTHour)
-                        .local()
-                        .format("h a")}
+                      {pstHourToLocal(reminderPSTHour).format("h a")}
                     </p>
                   </div>
                   <div>
