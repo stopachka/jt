@@ -11,12 +11,13 @@ import {
 import * as firebase from "firebase/app";
 import { loadStripe } from "@stripe/stripe-js";
 import marked from "marked";
-import { Form, Input, Button, Spin, Modal, message } from "antd";
+import { TimePicker, Form, Input, Button, Spin, Modal, message } from "antd";
 import { LoadingOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import qs from "qs";
 import howWasYourDayImg from "./images/step-how-was-your-day.png";
 import summaryImg from "./images/step-summary.png";
 import inviteFriendsImg from "./images/step-invite-friends.png";
-import qs from "qs";
+import moment from "moment-timezone";
 
 // ----
 // Initiate Firebase
@@ -196,7 +197,7 @@ class ProfileHome extends React.Component {
       isLoadingGroups: true,
       isLoadingSchedule: true,
       idToGroup: {},
-      schedule: null,
+      reminderPSTHour: 12,
     };
     this._idToGroupRef = {};
     this._userGroupIdsRef = firebase
@@ -205,16 +206,6 @@ class ProfileHome extends React.Component {
     this._inviteFormRefs = {};
   }
   componentDidMount() {
-    jsonFetch(serverPath("api/me/schedule"))
-      .then((schedule) => {
-        this.setState({ schedule, isLoadingSchedule: false });
-      })
-      .catch((e) => {
-        message.error(
-          "Uh oh, I wasn't able to find your schedule. May be an intermitent bug"
-        );
-        this.setState({ isLoadingSchedule: false });
-      });
     // groups
     const updateGroups = (f) => {
       this.setState(({ idToGroup }) => ({
@@ -275,48 +266,58 @@ class ProfileHome extends React.Component {
     const {
       idToGroup,
       isLoadingGroups,
-      isLoadingSchedule,
-      schedule,
+      reminderPSTHour,
     } = this.state;
-    if (isLoadingGroups || isLoadingSchedule) {
+    if (isLoadingGroups) {
       return <FullScreenSpin />;
     }
     const groupEntries = Object.entries(idToGroup || {});
 
     return (
       <div className="Profile-container">
-        {schedule && schedule["reminder-ms"] && (
-          <div className="Profile-schedule-container">
-            <h2 className="Profile-schedule-title">
-              Your next reminder:{" "}
-              <span className="Profile-schedule-reminder-date">
-                {new Date(schedule["reminder-ms"]).toLocaleString("en-US", {
-                  weekday: "long",
-                  hour: "numeric",
-                  minute: "numeric",
-                })}
-              </span>
-            </h2>
-            <p className="Profile-schedule-desc">
-              🙌 Welcome. Watch your email around{" "}
-              {new Date(schedule["reminder-ms"]).toLocaleString("en-US", {
-                weekday: "long",
-                hour: "numeric",
-                minute: "numeric",
-              })}
-              . You'll receive an email from Journal Buddy, asking about your
-              day. We'll record your answers as journal entries. Don't want to
-              wait? Simply send an email to{" "}
-              <a
-                href="mailto:journal-buddy@mg.journaltogether.com"
-                target="_blank"
-              >
-                journal-buddy@mg.journaltogether.com
-              </a>
-              , and you can log right away
-            </p>
-          </div>
-        )}
+        <div className="Profile-schedule-container">
+          <h2 className="Profile-schedule-title">
+            Your next reminder:{" "}
+            <span className="Profile-schedule-reminder-date">
+              <TimePicker
+                use12Hours
+                className="Profile-hour-picker"
+                allowClear={false}
+                suffixIcon={null}
+                value={moment()
+                  .tz("America/Los_Angeles")
+                  .hour(reminderPSTHour)
+                  .local()}
+                format="h a"
+                onChange={(m) => {
+                  this.setState({
+                    reminderPSTHour: moment(m)
+                      .tz("America/Los_Angeles")
+                      .get("hour"),
+                  });
+                }}
+              />
+            </span>
+          </h2>
+          <p className="Profile-schedule-desc">
+            🙌 Welcome. Watch your email around{" "}
+            {moment()
+              .tz("America/Los_Angeles")
+              .hour(reminderPSTHour)
+              .local()
+              .format("h a")}{" "}
+            . You'll receive an email from Journal Buddy, asking about your day.
+            We'll record your answers as journal entries. Don't want to wait?
+            Simply send an email to{" "}
+            <a
+              href="mailto:journal-buddy@mg.journaltogether.com"
+              target="_blank"
+            >
+              journal-buddy@mg.journaltogether.com
+            </a>
+            , and you can log right away
+          </p>
+        </div>
         {groupEntries.length > 0 && (
           <div className="Profile-groups-container">
             <h2 className="Profile-groups-title">Your groups</h2>
@@ -361,6 +362,40 @@ class ProfileHome extends React.Component {
                     >
                       Delete Group
                     </Button>
+                  </div>
+                  <div className="">
+                    <h4 className="Profile-schedule-title">
+                      Your next summary:{" "}
+                      <span className="Profile-schedule-reminder-date">
+                        <TimePicker 
+                          className="Profile-hour-picker"
+                          use12Hours
+                          allowClear={false}
+                          suffixIcon={null}
+                          value={moment()
+                            .tz("America/Los_Angeles")
+                            .hour(reminderPSTHour)
+                            .local()}
+                          format="h a"
+                          onChange={(m) => {
+                            this.setState({
+                              reminderPSTHour: moment(m)
+                                .tz("America/Los_Angeles")
+                                .get("hour"),
+                            });
+                          }}
+                        />
+                      </span>
+                    </h4>
+                    <p className="Profile-summary-schedule-content">
+                      You'll receive a summary email, with what all your friends
+                      wrote at{" "}
+                      {moment()
+                        .tz("America/Los_Angeles")
+                        .hour(reminderPSTHour)
+                        .local()
+                        .format("h a")}
+                    </p>
                   </div>
                   <div>
                     {g.users && (

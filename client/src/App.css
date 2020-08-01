@@ -335,3 +335,24 @@ button {
 .Profile-schedule-reminder-date {
   color: blue;
 }
+
+.Profile-hour-picker {
+  margin: 0 0.5em;
+  padding: 0;
+  font-size: inherit;
+  font-weight: inherit;
+}
+.Profile-hour-picker, 
+.Profile-hour-picker> input:focus, 
+.Profile-hour-picker > input-focused { 
+  border: none;
+  outline: none;
+  border-bottom: 1px solid blue;
+  box-shadow: none;
+}
+
+.Profile-hour-picker input {
+  font-size: inherit;
+  font-weight: inherit;
+  color: blue;
+}
