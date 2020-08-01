@@ -113,22 +113,9 @@
   []
   (ZonedDateTime/now pst-zone))
 
-(defn pst-instant
-  [h m s]
-  (-> (LocalTime/of h m s)
-      (.adjustInto (pst-now))
-      .toInstant))
-
-
 (defn daily-period
   [inst]
   (chime-core/periodic-seq inst (Period/ofDays 1)))
-
-
-(defn after-now
-  [period]
-  (let [now (pst-now)]
-    (filter #(.isAfter % now) period)))
 
 (defn hourly-period []
   (let [now (pst-now)
@@ -142,18 +129,6 @@
          (mapcat ->all-hours)
          (map adjust-mins-to-five)
          (filter after-now?))))
-
-(defn reminder-period
-  []
-  (-> (pst-instant 13 0 0)
-      daily-period
-      after-now))
-
-(defn summary-period
-  []
-  (-> (pst-instant 5 0 0)
-      daily-period
-      after-now))
 
 ;; ------------------------------------------------------------------------------
 ;; Sender
@@ -393,28 +368,6 @@
                      (send-summary start-date g)
                      (catch Exception e
                        (log/errorf e "failed to send summary to group %s" g)))))
-           doall))))
-
-;; ------------------------------------------------------------------------------
-;; Schedule V2
-
-(defn handle-reminder-2
-  "This is the new version of handle-reminder. This will allow users to
-  choose preferences every hour"
-  [_]
-  (let [date (pst-now)
-        hour (.getHour (pst-now))
-        task-id (str "send-reminder-2" hour "-" (->numeric-date-str date))]
-    (when (try-grab-task task-id)
-      (->> (db/get-users-by-reminder-hour hour)
-           (filter (comp send-reminder? :email))
-           (pmap
-             (fn [{:keys [email] :as user}]
-               (try
-                 (log/infof "attempt sender-reminder: %s" user)
-                 (send-email (content-hows-your-day? date email))
-                 (catch Exception e
-                   (log/errorf e "failed send-reminder: %s" user)))))
            doall))))
 
 ;; ------------------------------------------------------------------------------
