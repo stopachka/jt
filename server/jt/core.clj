@@ -236,7 +236,11 @@
           "</p>"
           (->> users-with-entries
                (map ->user-section-html)
-               str/join))}))
+               str/join)
+          "<hr />"
+          "<p><em>"
+          "Thoughts, comments? You can reply all to this email to start a conversation :)"
+          "</em></p>")}))
 
 
 (defn content-ack-receive
@@ -340,7 +344,7 @@
   [_]
   (let [now (pst-now)
         h (.getHour now)
-        task-id (str "send-reminder-" (->numeric-date-str now))]
+        task-id (str "send-reminder-" (->numeric-date-str now) "-" h)]
     (when (try-grab-task task-id)
       (->> (db/get-users-by-reminder-hour h)
            (filter (comp send-reminder? :email))
@@ -381,7 +385,7 @@
   (let [now (pst-now)
         start-date (.minusDays now 1)
         h (.getHour now)
-        task-id (str "handle-summary-" (->numeric-date-str start-date))]
+        task-id (str "handle-summary-" (->numeric-date-str start-date) "-" h)]
     (when (try-grab-task task-id)
       (->> (db/get-groups-by-summary-hour h)
            (pmap (fn [[_k g]]
