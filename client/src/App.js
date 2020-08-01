@@ -218,15 +218,24 @@ class ProfileHome extends React.Component {
       isLoadingGroups: true,
       isLoadingSchedule: true,
       idToGroup: {},
-      reminderPSTHour: 12,
+      reminderPSTHour: null,
     };
     this._idToGroupRef = {};
+    this._reminderPSTHourRef = firebase
+      .database()
+      .ref(`/users/${this.props.loginData.uid}/reminder-options/send-pst-hour`);
     this._userGroupIdsRef = firebase
       .database()
       .ref(`/users/${this.props.loginData.uid}/groups`);
     this._inviteFormRefs = {};
   }
   componentDidMount() {
+    this._reminderPSTHourRef.on("value", (snap) => {
+      this.setState({
+        isLoadingSchedule: false,
+        reminderPSTHour: snap.val(),
+      });
+    });
     // groups
     const updateGroups = (f) => {
       this.setState(({ idToGroup }) => ({
@@ -279,52 +288,64 @@ class ProfileHome extends React.Component {
 
   componentWillUnmount() {
     this._userGroupIdsRef.off();
+    this._reminderPSTHourRef.off();
     Object.values(this._idToGroupRef).forEach((ref) => ref.off());
   }
 
   render() {
     const { loginData } = this.props;
-    const { idToGroup, isLoadingGroups, reminderPSTHour } = this.state;
-    if (isLoadingGroups) {
+    const {
+      idToGroup,
+      isLoadingGroups,
+      isLoadingSchedule,
+      reminderPSTHour,
+    } = this.state;
+    if (isLoadingGroups || isLoadingSchedule) {
       return <FullScreenSpin />;
     }
     const groupEntries = Object.entries(idToGroup || {});
 
     return (
       <div className="Profile-container">
-        <div className="Profile-schedule-container">
-          <h2 className="Profile-schedule-title">
-            Your next reminder:{" "}
-            <span className="Profile-schedule-reminder-date">
-              <HourPicker
-                value={pstHourToLocal(reminderPSTHour)}
-                onChange={(m) => {
-                  this.setState({
-                    reminderPSTHour: pstHour(moment(m)),
-                  });
-                }}
-              />
-            </span>
-          </h2>
-          <p className="Profile-schedule-desc">
-            🙌 Welcome. Watch your email around{" "}
-            {pstHourToLocal(reminderPSTHour).format("h a")}
-            . You'll receive an email from Journal Buddy, asking about your day.
-            We'll record your answers as journal entries. Don't want to wait?
-            Simply send an email to{" "}
-            <a
-              href="mailto:journal-buddy@mg.journaltogether.com"
-              target="_blank"
-            >
-              journal-buddy@mg.journaltogether.com
-            </a>
-            , and you can log right away
-          </p>
-        </div>
+        {reminderPSTHour != null && (
+          <div className="Profile-schedule-container">
+            <h2 className="Profile-schedule-title">
+              Your next reminder:{" "}
+              <span className="Profile-schedule-reminder-date">
+                <HourPicker
+                  value={pstHourToLocal(reminderPSTHour)}
+                  onChange={(m) => {
+                    firebase
+                      .database()
+                      .ref(
+                        `/users/${this.props.loginData.uid}/reminder-options/send-pst-hour`
+                      )
+                      .set(pstHour(moment(m)));
+                  }}
+                />
+              </span>
+            </h2>
+            <p className="Profile-schedule-desc">
+              🙌 Welcome. Watch your email around{" "}
+              {pstHourToLocal(reminderPSTHour).format("h a")}. You'll receive an
+              email from Journal Buddy, asking about your day. We'll record your
+              answers as journal entries. Don't want to wait? Simply send an
+              email to{" "}
+              <a
+                href="mailto:journal-buddy@mg.journaltogether.com"
+                target="_blank"
+              >
+                journal-buddy@mg.journaltogether.com
+              </a>
+              , and you can log right away
+            </p>
+          </div>
+        )}
         {groupEntries.length > 0 && (
           <div className="Profile-groups-container">
             <h2 className="Profile-groups-title">Your groups</h2>
             {groupEntries.map(([k, g]) => {
+              const summarySendHourPST = g['summary-options'] && g['summary-options']['send-hour-pst'];
               return (
                 <div className="Profile-group">
                   <div className="Profile-group-header">
@@ -382,8 +403,7 @@ class ProfileHome extends React.Component {
                     </h4>
                     <p className="Profile-summary-schedule-content">
                       You'll receive a summary email, with what all your friends
-                      wrote at{" "}
-                      {pstHourToLocal(reminderPSTHour).format("h a")}
+                      wrote at {pstHourToLocal(reminderPSTHour).format("h a")}
                     </p>
                   </div>
                   <div>
