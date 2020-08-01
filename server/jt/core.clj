@@ -41,7 +41,8 @@
       ZoneId
       ZonedDateTime)
     (java.time.format
-      DateTimeFormatter)))
+      DateTimeFormatter)
+    (java.time.temporal ChronoUnit)))
 
 ;; ------------------------------------------------------------------------------
 ;; Helpers
@@ -119,15 +120,15 @@
 
 (defn hourly-period []
   (let [now (pst-now)
+        start-of-hour (fn [date h] (-> date
+                                       (.withHour h)
+                                       (.truncatedTo ChronoUnit/HOURS)))
         ->all-hours (fn [date]
-                      (->> (range 24)
-                           (map #(.withHour date %))))
-        adjust-mins-to-five (fn [date]
-                              (.withMinute date 5))
+                      (map (partial start-of-hour date)
+                           (range 24)))
         after-now? #(.isAfter % now)]
-    (->> (daily-period (pst-now))
+    (->> (daily-period now)
          (mapcat ->all-hours)
-         (map adjust-mins-to-five)
          (filter after-now?))))
 
 ;; ------------------------------------------------------------------------------
@@ -304,11 +305,25 @@
   (not (contains? (profile/get-secret :emails :reminder-ignore) email)))
 
 
+(defn rounded-hour
+  "Our hourly periods are envoked by the scheduler.
+  Our goal is to understand what hour it is.
+  In the case the scheduler invokes us at 14:59:59, for example,
+  we would want to get the hour as 15."
+  [zoned-date]
+  (let [min-frac (/ (.getMinute zoned-date) 60)]
+    (cond->
+      zoned-date
+      (>= min-frac 1/2)
+      (.plusHours 1)
+      :else
+      (.truncatedTo ChronoUnit/HOURS))))
+
 (defn handle-reminder
   [_]
-  (let [now (pst-now)
-        h (.getHour now)
-        task-id (str "send-reminder-" (->numeric-date-str now) "-" h)]
+  (let [date (rounded-hour (pst-now))
+        h (.getHour date)
+        task-id (str "send-reminder-" (->numeric-date-str date) "-" h)]
     (when (try-grab-task task-id)
       (->> (db/get-users-by-reminder-hour h)
            (filter (comp send-reminder? :email))
@@ -316,7 +331,7 @@
              (fn [{:keys [email] :as user}]
                (try
                  (log/infof "attempt sender-reminder: %s" user)
-                 (send-email (content-hows-your-day? now email))
+                 (send-email (content-hows-your-day? date email))
                  (catch Exception e
                    (log/errorf e "failed send-reminder: %s" user)))))
            doall))))
@@ -346,9 +361,9 @@
 
 (defn handle-summary
   [_]
-  (let [now (pst-now)
-        start-date (.minusDays now 1)
-        h (.getHour now)
+  (let [date (rounded-hour (pst-now))
+        h (.getHour date)
+        start-date (.minusDays date 1)
         task-id (str "handle-summary-" (->numeric-date-str start-date) "-" h)]
     (when (try-grab-task task-id)
       (->> (db/get-groups-by-summary-hour h)
