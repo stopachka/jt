@@ -114,12 +114,9 @@
   []
   (ZonedDateTime/now pst-zone))
 
-(defn daily-period
-  [inst]
-  (chime-core/periodic-seq inst (Period/ofDays 1)))
-
 (defn hourly-period []
   (let [now (pst-now)
+        daily-period #(chime-core/periodic-seq % (Period/ofDays 1))
         start-of-hour (fn [date h] (-> date
                                        (.withHour h)
                                        (.truncatedTo ChronoUnit/HOURS)))
@@ -629,6 +626,16 @@
   static-routes
   (resources "/" {:root (profile/get-config :static-root)})
   (GET "*" [] (render-static-file "index.html")))
+
+;; ------------------------------------------------------------------------------
+;; Misc helpers
+
+(defn notif-emails
+  "Quick fn to get all user emails, if I need to send them an update"
+  []
+  (->> (db/get-all-users)
+       (map :email)
+       (remove (profile/get-secret :emails :notif-ignore))))
 
 ;; ------------------------------------------------------------------------------
 ;; Off- topic: Stopa's other notifications
