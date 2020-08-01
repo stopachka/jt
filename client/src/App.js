@@ -190,6 +190,27 @@ class SignIn extends React.Component {
   }
 }
 
+function HourPicker(props) {
+  return (
+    <TimePicker
+      use12Hours
+      className="Profile-hour-picker"
+      allowClear={false}
+      suffixIcon={null}
+      format="h a"
+      {...props}
+    />
+  );
+}
+
+function pstHourToLocal(pstHour) {
+  return moment().tz("America/Los_Angeles").hour(pstHour).local();
+}
+
+function pstHour(m) {
+  return m.tz("America/Los_Angeles").get("hour");
+}
+
 class ProfileHome extends React.Component {
   constructor(props) {
     super(props);
@@ -263,11 +284,7 @@ class ProfileHome extends React.Component {
 
   render() {
     const { loginData } = this.props;
-    const {
-      idToGroup,
-      isLoadingGroups,
-      reminderPSTHour,
-    } = this.state;
+    const { idToGroup, isLoadingGroups, reminderPSTHour } = this.state;
     if (isLoadingGroups) {
       return <FullScreenSpin />;
     }
@@ -279,21 +296,11 @@ class ProfileHome extends React.Component {
           <h2 className="Profile-schedule-title">
             Your next reminder:{" "}
             <span className="Profile-schedule-reminder-date">
-              <TimePicker
-                use12Hours
-                className="Profile-hour-picker"
-                allowClear={false}
-                suffixIcon={null}
-                value={moment()
-                  .tz("America/Los_Angeles")
-                  .hour(reminderPSTHour)
-                  .local()}
-                format="h a"
+              <HourPicker
+                value={pstHourToLocal(reminderPSTHour)}
                 onChange={(m) => {
                   this.setState({
-                    reminderPSTHour: moment(m)
-                      .tz("America/Los_Angeles")
-                      .get("hour"),
+                    reminderPSTHour: pstHour(moment(m)),
                   });
                 }}
               />
@@ -367,21 +374,11 @@ class ProfileHome extends React.Component {
                     <h4 className="Profile-schedule-title">
                       Your next summary:{" "}
                       <span className="Profile-schedule-reminder-date">
-                        <TimePicker 
-                          className="Profile-hour-picker"
-                          use12Hours
-                          allowClear={false}
-                          suffixIcon={null}
-                          value={moment()
-                            .tz("America/Los_Angeles")
-                            .hour(reminderPSTHour)
-                            .local()}
-                          format="h a"
+                        <HourPicker
+                          value={pstHourToLocal(reminderPSTHour)}
                           onChange={(m) => {
                             this.setState({
-                              reminderPSTHour: moment(m)
-                                .tz("America/Los_Angeles")
-                                .get("hour"),
+                              reminderPSTHour: pstHour(moment(m)),
                             });
                           }}
                         />
