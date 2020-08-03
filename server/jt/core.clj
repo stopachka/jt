@@ -19,6 +19,7 @@
     [ring.middleware.json :refer [wrap-json-body wrap-json-response]]
     [ring.middleware.keyword-params :refer [wrap-keyword-params]]
     [ring.middleware.params :refer [wrap-params]]
+    [ring.middleware.multipart-params :refer [wrap-multipart-params]]
     [ring.util.request :refer [body-string]]
     [ring.util.response :as resp :refer [response bad-request]])
   (:import
@@ -35,7 +36,6 @@
       Webhook)
     (java.time
       DayOfWeek
-      Instant
       LocalTime
       Period
       ZoneId
@@ -411,15 +411,29 @@
     {:key (profile/get-secret :mailgun :api-key)
      :alg :hmac+sha256}))
 
+(defn parse-email-attachments
+  "Mailgun sends flat attachments.
+  If there are any, it comes with keys attachment-1, attachment-2, etc
+  This fn converts this to a list, for simpler manipulation"
+  [params]
+  (loop [ret []]
+    (if-let [att ((keyword (str "attachment-" (+ 1 (count ret))))
+                  params)]
+      (recur (conj ret att))
+      ret)))
 
 (defn emails-handler
   [{:keys [params] :as _req}]
   (assert (verify-sender params)
           (format "Could not verify message came from mailgun %s" params))
   (fut-bg
-    (let [{:keys [recipient sender] :as data}
-          (-> params
-              (assoc :date (parse-email-date params)))]
+    (let [date (parse-email-date params)
+          attachments (parse-email-attachments params)
+          {:keys [recipient sender] :as data}
+          (cond->
+            params
+            date (assoc :date date)
+            (seq attachments) (assoc :attachments attachments))]
       (condp = recipient
         (:raw-email hows-your-day-sender)
         (handle-hows-your-day-response data)
@@ -718,6 +732,7 @@
                 (-> api-routes
                     wrap-keyword-params
                     wrap-params
+                    wrap-multipart-params
                     (wrap-json-body {:keywords? true})
                     wrap-json-response
                     (wrap-cors :access-control-allow-origin [#".*"]

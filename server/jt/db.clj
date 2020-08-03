@@ -432,7 +432,11 @@
 
 (defn init
   []
-  (let [{:keys [db-url auth project-id]} (profile/get-config :firebase)
+  (let [{:keys
+         [db-url
+          storage-bucket
+          auth
+          project-id]} (profile/get-config :firebase)
         {:keys
          [client-id
           client-email
@@ -448,6 +452,7 @@
                     (.setCredentials creds)
                     (.setProjectId project-id)
                     (.setDatabaseUrl db-url)
+                    (.setStorageBucket storage-bucket)
                     (.setDatabaseAuthVariableOverride
                       (stringify-keys auth))
                     .build)]

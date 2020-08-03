@@ -10,4 +10,5 @@
  :firebase
  {:auth {:uid "jt-sv"}
   :project-id "journaltogether"
+  :storage-bucket "journaltogether.appspot.com"
   :db-url "https://journaltogether.firebaseio.com"}}
