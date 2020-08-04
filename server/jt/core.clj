@@ -611,6 +611,14 @@
 ;; ------------------------------------------------------------------------------
 ;; Server
 
+(defn wrap-exception [handler]
+  (fn [request]
+    (try (handler request)
+         (catch Exception e
+           (log/errorf e "uncaught exception, request=%s" request)
+           {:status 500
+            :body "Something went wrong. Please Ping Stopa :<"}))))
+
 (defn render-static-file
   [filename]
   (resp/content-type
@@ -728,7 +736,8 @@
     (let [port (profile/get-config :port)
           app (routes
                 (-> webhook-routes
-                    wrap-json-response)
+                    wrap-json-response
+                    wrap-exception)
                 (-> api-routes
                     wrap-keyword-params
                     wrap-params
@@ -736,7 +745,8 @@
                     (wrap-json-body {:keywords? true})
                     wrap-json-response
                     (wrap-cors :access-control-allow-origin [#".*"]
-                               :access-control-allow-methods [:get :put :post :delete]))
+                               :access-control-allow-methods [:get :put :post :delete])
+                    wrap-exception)
                 static-routes)]
       (jetty/run-jetty app {:port port}))
     (log/info "kicked off!")))
