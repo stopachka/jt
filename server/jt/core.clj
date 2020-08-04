@@ -611,11 +611,11 @@
 ;; ------------------------------------------------------------------------------
 ;; Server
 
-(defn wrap-exception [handler]
+(defn wrap-errors [handler]
   (fn [request]
     (try (handler request)
-         (catch Exception e
-           (log/errorf e "uncaught exception, request=%s" request)
+         (catch Throwable e
+           (log/errorf e "uncaught error, request=%s" request)
            {:status 500
             :body "Something went wrong. Please Ping Stopa :<"}))))
 
@@ -737,7 +737,7 @@
           app (routes
                 (-> webhook-routes
                     wrap-json-response
-                    wrap-exception)
+                    wrap-errors)
                 (-> api-routes
                     wrap-keyword-params
                     wrap-params
@@ -746,7 +746,7 @@
                     wrap-json-response
                     (wrap-cors :access-control-allow-origin [#".*"]
                                :access-control-allow-methods [:get :put :post :delete])
-                    wrap-exception)
+                    wrap-errors)
                 static-routes)]
       (jetty/run-jetty app {:port port}))
     (log/info "kicked off!")))
