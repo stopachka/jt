@@ -129,16 +129,6 @@
    :email (.getEmail x)})
 
 
-(defn create-user
-  [email]
-  (let [user (-> (FirebaseAuth/getInstance)
-                 (.createUser (-> (UserRecord$CreateRequest.)
-                                  (.setEmail email)
-                                  (.setEmailVerified true)))
-                 user-record->map)]
-    (create-payment-info user)
-    user))
-
 
 (defn get-user-by-email
   [email]
@@ -223,6 +213,23 @@
   (firebase-save
     (firebase-ref (str "/users/" uid "/level/"))
     (name level)))
+
+(defn save-reminder-hour
+  [uid h]
+  (firebase-save
+    (firebase-ref (str "/users/" uid "/reminder-options/send-pst-hour"))
+    h))
+
+(defn create-user
+  [email]
+  (let [user (-> (FirebaseAuth/getInstance)
+                 (.createUser (-> (UserRecord$CreateRequest.)
+                                  (.setEmail email)
+                                  (.setEmailVerified true)))
+                 user-record->map)]
+    (create-payment-info user)
+    (save-reminder-hour (:uid user) 13)
+    user))
 
 (defn get-user-ids-by-reminder-hour
   "Gets all the user that have a certain time pref.

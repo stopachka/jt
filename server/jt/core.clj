@@ -489,7 +489,7 @@
   (let [{:keys [code]} body
         {:keys [email invitations] :as magic} (db/consume-magic-code code)
 
-        _ (assert (email? email) (format "Expected a valid email = %s" email))]
+        _ (assert (email? email) (format "Expected a valid magic = %s" magic))]
     (fut-bg
       (send-email (content-notify-ceo-about-magic magic)))
     (let [{:keys [uid]} (or (db/get-user-by-email email)
