@@ -2,7 +2,8 @@
   (:require
     [clojure.walk :refer [stringify-keys]]
     [jt.concurrency :refer [fut-bg throwable-promise]]
-    [jt.profile :as profile])
+    [jt.profile :as profile]
+    [clojure.tools.logging :as log])
   (:import
     (com.google.auth.oauth2
       ServiceAccountCredentials)
@@ -361,6 +362,7 @@
 (defn consume-magic-code
   [code]
   (when-let [res (get-magic-code code)]
+    (log/infof "consuming magic code %s" code)
     (kill-magic-code code)
     res))
 

@@ -462,6 +462,7 @@
 
 (defn accept-invitation
   [id]
+  (log/infof "accepting invitation id %s" id)
   (let [{:keys [sender-email group-id receiver-email] :as invitation}
         (db/get-invitation-by-id id)
 
@@ -480,6 +481,7 @@
             (db/user-belongs-to-group? group sender-user)
             (format "Expected sender-user = %s to belong to group = %s"
                     sender-user group))]
+    (log/infof "accepting invitation %s receiver-user %s group %s" invitation receiver-user group)
     (db/delete-invitation id)
     (db/add-user-to-group receiver-user group-id)))
 
