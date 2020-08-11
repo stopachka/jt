@@ -409,7 +409,7 @@ class ProfileHome extends React.Component {
                       <p className="Profile-summary-schedule-content">
                         You'll receive a summary email, with what all your
                         friends wrote at{" "}
-                        {pstHourToLocal(reminderPSTHour).format("h a")}
+                        {pstHourToLocal(summarySendHourPST).format("h a")}
                       </p>
                     </div>
                   )}
