@@ -422,6 +422,11 @@
       (recur (conj ret att))
       ret)))
 
+(defn ->saved-att [x]
+  ;; TODO
+  ;; set up a mailgun att, then start playing here
+  x)
+
 (defn emails-handler
   [{:keys [params] :as _req}]
   (assert (verify-sender params)
@@ -433,7 +438,8 @@
           (cond->
             params
             date (assoc :date date)
-            (seq attachments) (assoc :attachments attachments))]
+            (seq attachments) (assoc :attachments
+                                     (pmap ->saved-att attachments)))]
       (condp = recipient
         (:raw-email hows-your-day-sender)
         (handle-hows-your-day-response data)
