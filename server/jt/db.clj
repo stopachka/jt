@@ -25,7 +25,11 @@
     (java.time
       ZonedDateTime)
     (java.time.format
-      DateTimeFormatter)))
+      DateTimeFormatter)
+    (com.google.firebase.cloud StorageClient)
+    (com.google.cloud.storage BlobId BlobInfo Storage$BlobWriteOption Bucket$BlobWriteOption)
+    (java.util UUID)
+    (java.io FileInputStream InputStream)))
 
 
 (defprotocol ConvertibleToClojure
@@ -88,6 +92,22 @@
                (onCancelled
                  [_this err]
                  (reject (.toException err)))))))))
+
+(defn upload-att [{:keys [filename content-type tempfile] :as att}]
+  (let [bucket (.bucket (StorageClient/getInstance))
+        blob-name (str (UUID/randomUUID)
+                       "/"
+                       filename)
+        input-stream (FileInputStream. tempfile)
+        options (into-array Bucket$BlobWriteOption [])
+        blob (.create
+               bucket
+               ^String blob-name
+               ^InputStream input-stream
+               ^String content-type
+               options)]
+    {:content-type (.getContentType blob)
+     :name (.getName blob)}))
 
 ;; ------------------------------------------------------------------------------
 ;; payment-info

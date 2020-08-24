@@ -422,24 +422,23 @@
       (recur (conj ret att))
       ret)))
 
-(defn ->saved-att [x]
-  ;; TODO
-  ;; set up a mailgun att, then start playing here
-  x)
-
 (defn emails-handler
   [{:keys [params] :as _req}]
   (assert (verify-sender params)
           (format "Could not verify message came from mailgun %s" params))
   (fut-bg
     (let [date (parse-email-date params)
-          attachments (parse-email-attachments params)
+          attachments (->> params
+                           parse-email-attachments
+                           (pmap db/upload-att)
+                           doall
+                           seq)
           {:keys [recipient sender] :as data}
           (cond->
             params
             date (assoc :date date)
             (seq attachments) (assoc :attachments
-                                     (pmap ->saved-att attachments)))]
+                                     attachments))]
       (condp = recipient
         (:raw-email hows-your-day-sender)
         (handle-hows-your-day-response data)
