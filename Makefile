@@ -2,7 +2,7 @@ dev-client:
 	cd client && yarn start
 
 dev-repl:
-	clj -A:socket
+	clj -A:rebl
 
 dev-tmux:
 	tmux new-session -d -s jt 'make dev-repl'

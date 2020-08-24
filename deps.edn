@@ -12,9 +12,21 @@
         markdown-clj {:mvn/version "1.10.4"}
         com.stripe/stripe-java {:mvn/version "19.27.0"}
         buddy/buddy-core {:mvn/version "1.6.0"}}
- :aliases {:socket
-           {:jvm-opts ["-Dclojure.server.repl={:port,50505,:accept,clojure.core.server/repl}"]}
-           :uberjar
-           {:extra-deps
-            {seancorfield/depstar {:mvn/version "1.0.94"}}
-            :main-opts ["-m" "hf.depstar.uberjar"]}}}
+ :aliases
+ {:rebl
+  {:extra-deps {socket.rebl {:git/url "https://github.com/seancorfield/socket-rebl"
+                             :sha "60b3ccc71bd6b9287565897f52e99dc77a10fd1a"}
+                com.cognitect/rebl {:mvn/version "0.9.240"}
+                org.openjfx/javafx-fxml {:mvn/version "15-ea+6"}
+                org.openjfx/javafx-controls {:mvn/version "15-ea+6"}
+                org.openjfx/javafx-swing {:mvn/version "15-ea+6"}
+                org.openjfx/javafx-base {:mvn/version "15-ea+6"}
+                org.openjfx/javafx-web {:mvn/version "15-ea+6"}}
+   :jvm-opts ["-Dclojure.server.rebl={:port,50505,:accept,socket.rebl/repl}"]
+   :main-opts ["-m" "cognitect.rebl"]}
+  :socket
+  {:jvm-opts ["-Dclojure.server.repl={:port,50505,:accept,clojure.core.server/repl}"]}
+  :uberjar
+  {:extra-deps
+   {seancorfield/depstar {:mvn/version "1.0.94"}}
+   :main-opts ["-m" "hf.depstar.uberjar"]}}}
