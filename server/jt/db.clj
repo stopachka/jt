@@ -93,7 +93,7 @@
                  [_this err]
                  (reject (.toException err)))))))))
 
-(defn upload-att [{:keys [filename content-type tempfile] :as att}]
+(defn upload-att [{:keys [filename content-type tempfile] :as _att}]
   (let [bucket (.bucket (StorageClient/getInstance))
         blob-name (str (UUID/randomUUID)
                        "/"
@@ -398,7 +398,7 @@
 
 (def entry-keys
   #{:sender :subject :stripped-text :stripped-html
-    :recipient :body-html :body-plain :date})
+    :recipient :body-html :body-plain :date :attachments})
 
 
 (def entry-date-formatter
