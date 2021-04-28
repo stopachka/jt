@@ -318,23 +318,12 @@
       (log/infof "[task] skipping %s" task-id)
       nil)))
 
-
-(defn send-reminder?
-  "Some users do not want to receive a reminder email, asking about
-  their day. The use case here, is I think, they simply want to follow
-  along with their friend's journals. I am not sure about this UX, but
-  supporting it for the few folks who asked for this."
-  [email]
-  (not (contains? (profile/get-secret :emails :reminder-ignore) email)))
-
-
 (defn handle-reminder
   [_]
   (let [day (pst-now)
         task-id (str "send-reminder-" (->numeric-date-str day))]
     (when (try-grab-task task-id)
-      (->> (db/get-all-users)
-           (filter (comp send-reminder? :email))
+      (->> (db/get-users-who-want-reminders)
            (pmap
              (fn [{:keys [email] :as user}]
                (try
@@ -378,28 +367,6 @@
                      (send-summary start-date k g)
                      (catch Exception e
                        (log/errorf e "failed to send summary to group %s" g)))))
-           doall))))
-
-;; ------------------------------------------------------------------------------
-;; Schedule V2
-
-(defn handle-reminder-2
-  "This is the new version of handle-reminder. This will allow users to
-  choose preferences every hour"
-  [_]
-  (let [date (pst-now)
-        hour (.getHour (pst-now))
-        task-id (str "send-reminder-" hour "-" (->numeric-date-str date))]
-    (when (try-grab-task task-id)
-      (->> (db/get-users-by-time-pref hour)
-           (filter (comp send-reminder? :email))
-           (pmap
-             (fn [{:keys [email] :as user}]
-               (try
-                 (log/infof "attempt sender-reminder: %s" user)
-                 (send-email (content-hows-your-day? day email))
-                 (catch Exception e
-                   (log/errorf e "failed send-reminder: %s" user)))))
            doall))))
 
 ;; ------------------------------------------------------------------------------
@@ -723,7 +690,6 @@
      "</p>"
      "<p>Then get rollin!</p>")})
 
-
 (defn handle-community-review
   [_]
   (send-email (content-review-community)))
@@ -745,10 +711,6 @@
     (chime-core/chime-at
       (reminder-period)
       handle-reminder
-      {:error-handler chime-error-handler})
-    (chime-core/chime-at
-      (reminder-period)
-      handle-reminder-2
       {:error-handler chime-error-handler})
     (chime-core/chime-at
       (summary-period)

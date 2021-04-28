@@ -1,31 +1,30 @@
 (ns jt.db
   (:require
-    [clojure.walk :refer [stringify-keys]]
-    [jt.concurrency :refer [fut-bg throwable-promise]]
-    [jt.profile :as profile])
+   [clojure.walk :refer [stringify-keys]]
+   [jt.concurrency :refer [fut-bg throwable-promise]]
+   [jt.profile :as profile])
   (:import
-    (com.google.auth.oauth2
-      ServiceAccountCredentials)
-    (com.google.firebase
-      FirebaseApp
-      FirebaseOptions$Builder)
-    (com.google.firebase.auth
-      FirebaseAuth
-      FirebaseAuthException
-      UserRecord$CreateRequest UidIdentifier)
-    (com.google.firebase.database
-      DatabaseReference
-      DatabaseReference$CompletionListener
-      FirebaseDatabase
-      Query
-      ValueEventListener)
-    (com.stripe.model
-      Customer)
-    (java.time
-      ZonedDateTime)
-    (java.time.format
-      DateTimeFormatter)))
-
+   (com.google.auth.oauth2
+    ServiceAccountCredentials)
+   (com.google.firebase
+    FirebaseApp
+    FirebaseOptions$Builder)
+   (com.google.firebase.auth
+    FirebaseAuth
+    FirebaseAuthException
+    UserRecord$CreateRequest UidIdentifier)
+   (com.google.firebase.database
+    DatabaseReference
+    DatabaseReference$CompletionListener
+    FirebaseDatabase
+    Query
+    ValueEventListener)
+   (com.stripe.model
+    Customer)
+   (java.time
+    ZonedDateTime)
+   (java.time.format
+    DateTimeFormatter)))
 
 (defprotocol ConvertibleToClojure
   "Converts nested java objects to clojure objects.
@@ -34,7 +33,6 @@
    to keywordized immutable clojure ones"
 
   (->clj [o]))
-
 
 (extend-protocol ConvertibleToClojure
   java.util.Map
@@ -52,41 +50,38 @@
   nil
   (->clj [_] nil))
 
-
 (defn firebase-ref
   [path]
   (-> (FirebaseDatabase/getInstance)
       (.getReference path)))
 
-
 (defn firebase-save
   [^DatabaseReference ref v]
   @(throwable-promise
-     (fn [resolve reject]
-       (-> ref
-           (.setValue
-             (stringify-keys v)
-             (reify DatabaseReference$CompletionListener
-               (onComplete
-                 [_this err ref]
-                 (if err (reject (.toException err))
-                     (resolve ref)))))))))
-
+    (fn [resolve reject]
+      (-> ref
+          (.setValue
+           (stringify-keys v)
+           (reify DatabaseReference$CompletionListener
+             (onComplete
+               [_this err ref]
+               (if err (reject (.toException err))
+                   (resolve ref)))))))))
 
 (defn firebase-fetch
   [^Query ref]
   @(throwable-promise
-     (fn [resolve reject]
-       (-> ref
-           (.addListenerForSingleValueEvent
-             (reify ValueEventListener
-               (onDataChange
-                 [_this s]
-                 (resolve (->> s .getValue ->clj)))
+    (fn [resolve reject]
+      (-> ref
+          (.addListenerForSingleValueEvent
+           (reify ValueEventListener
+             (onDataChange
+               [_this s]
+               (resolve (->> s .getValue ->clj)))
 
-               (onCancelled
-                 [_this err]
-                 (reject (.toException err)))))))))
+             (onCancelled
+               [_this err]
+               (reject (.toException err)))))))))
 
 ;; ------------------------------------------------------------------------------
 ;; payment-info
@@ -95,22 +90,18 @@
   [uid]
   (str "/users/" uid "/payment-info/"))
 
-
 (defn save-payment-info
   [uid payment-info]
   (firebase-save (firebase-ref (payment-info-path uid)) payment-info))
-
 
 (defn get-payment-info
   [uid]
   (firebase-fetch (firebase-ref (payment-info-path uid))))
 
-
 (defn create-payment-info
   [{:keys [uid email] :as _user}]
   (let [cus (Customer/create {"email" email})]
     (save-payment-info uid {:customer-id (.getId cus)})))
-
 
 (defn delete-payment-info
   [uid]
@@ -128,7 +119,6 @@
   {:uid (.getUid x)
    :email (.getEmail x)})
 
-
 (defn create-user
   [email]
   (let [user (-> (FirebaseAuth/getInstance)
@@ -138,7 +128,6 @@
                  user-record->map)]
     (create-payment-info user)
     user))
-
 
 (defn get-user-by-email
   [email]
@@ -151,26 +140,22 @@
         nil
         (throw e)))))
 
-
 (defn get-user-by-uid
   [uid]
   (-> (FirebaseAuth/getInstance)
       (.getUser uid)
       user-record->map))
 
-
 (defn create-token-for-uid
   [uid]
   (-> (FirebaseAuth/getInstance)
       (.createCustomToken uid)))
-
 
 (defn get-user-from-id-token
   [token]
   (-> (FirebaseAuth/getInstance)
       (.verifyIdToken token)
       user-record->map))
-
 
 (defn get-all-users
   []
@@ -179,10 +164,20 @@
                   (.listUsers nil))]
     (if page
       (recur (into
-               ret
-               (map user-record->map (.getValues page)))
+              ret
+              (map user-record->map (.getValues page)))
              (.getNextPage page))
       ret)))
+
+(defn reminder-option-disabled? [uid]
+  (-> (firebase-ref (str "/users/" uid "/reminder-options/disabled"))
+      firebase-fetch))
+
+(defn get-users-who-want-reminders []
+  (->> (get-all-users)
+       (pmap (fn [u] [u (reminder-option-disabled? (:uid u))]))
+       (remove (fn [[_ disabled?]] disabled?))
+       (map first)))
 
 (defn get-batched-users [user-ids]
   (letfn [(get-batch [identifiers]
@@ -211,18 +206,16 @@
                  get-user-by-uid)]
     user))
 
-
 (defn delete-user
   [uid]
   (-> (FirebaseAuth/getInstance)
       (.deleteUser uid)))
 
-
 (defn save-user-level
   [uid level]
   (firebase-save
-    (firebase-ref (str "/users/" uid "/level/"))
-    (name level)))
+   (firebase-ref (str "/users/" uid "/level/"))
+   (name level)))
 
 (defn get-user-ids-by-reminder-hour
   "Gets all the user that have a certain time pref.
@@ -239,39 +232,34 @@
 
 (defn get-users-by-reminder-hour [h]
   (get-batched-users
-    (get-user-ids-by-reminder-hour h)))
+   (get-user-ids-by-reminder-hour h)))
 
 ;; ------------------------------------------------------------------------------
 ;; groups
 
 (def group-root "/groups/")
 
-
 (defn get-all-groups
   []
   (firebase-fetch (firebase-ref group-root)))
-
 
 (defn get-group-by-id
   [id]
   (firebase-fetch (firebase-ref (str group-root id))))
 
-
 (defn add-user-to-group
   [{:keys [uid email]} group-id]
   (firebase-save
-    (firebase-ref (str "/groups/" group-id "/users/" uid "/email"))
-    email)
+   (firebase-ref (str "/groups/" group-id "/users/" uid "/email"))
+   email)
   (firebase-save
-    (firebase-ref (str "/users/" uid "/groups/" group-id))
-    true))
-
+   (firebase-ref (str "/users/" uid "/groups/" group-id))
+   true))
 
 (defn user-belongs-to-group?
   [group user]
   (let [uid-kw (-> user :uid keyword)]
     (-> group :users uid-kw boolean)))
-
 
 (defn get-user-groups
   [uid]
@@ -280,33 +268,29 @@
                       keys)]
     (map name group-kws)))
 
-
 (defn remove-user-from-group
   [uid group-id]
   (firebase-save
-    (firebase-ref (str "/groups/" group-id "/users/" uid))
-    nil)
+   (firebase-ref (str "/groups/" group-id "/users/" uid))
+   nil)
   (firebase-save
-    (firebase-ref (str "/users/" uid "/groups/" group-id))
-    nil))
-
+   (firebase-ref (str "/users/" uid "/groups/" group-id))
+   nil))
 
 (defn delete-group-memberships
   [uid]
   (let [group-ids (get-user-groups uid)]
     (doall
-      (pmap (partial remove-user-from-group uid) group-ids))))
+     (pmap (partial remove-user-from-group uid) group-ids))))
 
 ;; ------------------------------------------------------------------------------
 ;; invitations
 
 (def invitation-root "/invitations/")
 
-
 (defn get-invitation-by-id
   [id]
   (firebase-fetch (firebase-ref (str invitation-root id))))
-
 
 (defn delete-invitation
   [id]
@@ -317,11 +301,9 @@
 
 (def magic-code-root "/magic-codes/")
 
-
 (defn- magic-code-path
   [code]
   (str magic-code-root code))
-
 
 (defn create-magic-code
   [{:keys [email invitations]}]
@@ -333,16 +315,13 @@
                 .getKey)]
     {:key key}))
 
-
 (defn- get-magic-code
   [code]
   (firebase-fetch (firebase-ref (magic-code-path code))))
 
-
 (defn- kill-magic-code
   [code]
   (firebase-save (firebase-ref (magic-code-path code)) nil))
-
 
 (defn consume-magic-code
   [code]
@@ -359,25 +338,21 @@
       .toInstant
       .toEpochMilli))
 
-
 (def entry-keys
   #{:sender :subject :stripped-text :stripped-html
     :recipient :body-html :body-plain :date})
-
 
 (def entry-date-formatter
   (-> "EEE, d LLL yyyy HH:mm:ss ZZ"
       DateTimeFormatter/ofPattern))
 
-
 (defn save-entry
   [uid {:keys [date] :as entry}]
   (firebase-save
-    (firebase-ref (str "/entries/" uid "/" (->epoch-milli date)))
-    (-> entry
-        (select-keys entry-keys)
-        (update :date #(.format entry-date-formatter %)))))
-
+   (firebase-ref (str "/entries/" uid "/" (->epoch-milli date)))
+   (-> entry
+       (select-keys entry-keys)
+       (update :date #(.format entry-date-formatter %)))))
 
 (defn get-entries-between
   [uid start-date end-date]
@@ -392,12 +367,11 @@
          (sort-by first)
          (map (comp ->entry second)))))
 
-
 (defn delete-entries
   [uid]
   (firebase-save
-    (firebase-ref (str "/entries/" uid "/"))
-    nil))
+   (firebase-ref (str "/entries/" uid "/"))
+   nil))
 
 ;; ------------------------------------------------------------------------------
 ;; init
@@ -411,16 +385,16 @@
           private-key
           private-key-id]} (profile/get-secret :firebase)
         creds (ServiceAccountCredentials/fromPkcs8
-                client-id
-                client-email
-                private-key
-                private-key-id
-                [])
+               client-id
+               client-email
+               private-key
+               private-key-id
+               [])
         options (-> (FirebaseOptions$Builder.)
                     (.setCredentials creds)
                     (.setProjectId project-id)
                     (.setDatabaseUrl db-url)
                     (.setDatabaseAuthVariableOverride
-                      (stringify-keys auth))
+                     (stringify-keys auth))
                     .build)]
     (FirebaseApp/initializeApp options)))
