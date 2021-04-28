@@ -1,6 +1,8 @@
 .DS_Store
 .idea
 .cpcache
+.lsp
+.nrepl-port
 jt.iml
 jt.jar
 secrets

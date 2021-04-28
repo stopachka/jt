@@ -292,16 +292,6 @@
       (log/infof "[task] skipping %s" task-id)
       nil)))
 
-
-(defn send-reminder?
-  "Some users do not want to receive a reminder email, asking about
-  their day. The use case here, is I think, they simply want to follow
-  along with their friend's journals. I am not sure about this UX, but
-  supporting it for the few folks who asked for this."
-  [email]
-  (not (contains? (profile/get-secret :emails :reminder-ignore) email)))
-
-
 (defn rounded-hour
   "Our hourly periods are envoked by the scheduler.
   Our goal is to understand what hour it is.
@@ -323,7 +313,6 @@
         task-id (str "send-reminder-" (->numeric-date-str date) "-" h)]
     (when (try-grab-task task-id)
       (->> (db/get-users-by-reminder-hour h)
-           (filter (comp send-reminder? :email))
            (pmap
              (fn [{:keys [email] :as user}]
                (try

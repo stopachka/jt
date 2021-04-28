@@ -2,7 +2,7 @@ dev-client:
 	cd client && yarn start
 
 dev-repl:
-	clj -A:rebl
+	clj -R:nREPL -m nrepl.cmdline
 
 dev-tmux:
 	tmux new-session -d -s jt 'make dev-repl'

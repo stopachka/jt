@@ -1,6 +1,6 @@
 import React from "react";
 import "./App.css";
-import { withRouter } from "react-router";
+import {withRouter} from "react-router";
 import {
   BrowserRouter as Router,
   Switch,
@@ -9,10 +9,10 @@ import {
   NavLink,
 } from "react-router-dom";
 import * as firebase from "firebase/app";
-import { loadStripe } from "@stripe/stripe-js";
+import {loadStripe} from "@stripe/stripe-js";
 import marked from "marked";
-import { TimePicker, Form, Input, Button, Spin, Modal, message } from "antd";
-import { LoadingOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import {TimePicker, Form, Input, Button, Spin, Modal, Switch as AntSwitch, message} from "antd";
+import {LoadingOutlined, ExclamationCircleOutlined} from "@ant-design/icons";
 import qs from "qs";
 import howWasYourDayImg from "./images/step-how-was-your-day.png";
 import summaryImg from "./images/step-summary.png";
@@ -58,7 +58,7 @@ function serverPath(part) {
 function jsonFetch(path, opts = {}) {
   return fetch(path, {
     ...opts,
-    headers: { "Content-Type": "application/json", ...opts.headers },
+    headers: {"Content-Type": "application/json", ...opts.headers},
   }).then((x) => (x.status === 200 ? x.json() : Promise.reject(x.json())));
 }
 
@@ -69,7 +69,7 @@ function listenToLoginData(cb) {
   firebase.auth().onIdTokenChanged((user) => {
     if (!user) return cb(null);
     user.getIdToken().then(
-      (token) => cb({ uid: user.uid, email: user.email, token }),
+      (token) => cb({uid: user.uid, email: user.email, token}),
       (err) => {
         console.error("uh oh, auth failure", err);
         cb(null);
@@ -89,13 +89,13 @@ function isValidEmail(email) {
 // ----
 // Helper Components
 
-function FullScreenSpin({ message }) {
+function FullScreenSpin({message}) {
   return (
     <div className="Full-Screen-Loading-container">
       <div className="Full-Screen-Loading">
         <Spin
           tip={message}
-          indicator={<LoadingOutlined style={{ fontSize: 24 }} spin />}
+          indicator={<LoadingOutlined style={{fontSize: 24}} spin />}
         />
       </div>
     </div>
@@ -116,7 +116,7 @@ class SignIn extends React.Component {
     this._emailInput && this._emailInput.focus();
   }
   render() {
-    const { hasRequestedCode } = this.state;
+    const {hasRequestedCode} = this.state;
     if (hasRequestedCode) {
       return (
         <div className="Sign-in-success-container">
@@ -143,11 +143,11 @@ class SignIn extends React.Component {
           </div>
           <div className="Sign-in-form">
             <Form
-              onFinish={({ email }) => {
-                this.setState({ hasRequestedCode: true });
+              onFinish={({email}) => {
+                this.setState({hasRequestedCode: true});
                 jsonFetch(serverPath("api/magic/request"), {
                   method: "POST",
-                  body: JSON.stringify({ email }),
+                  body: JSON.stringify({email}),
                 }).catch(() => {
                   message.error(
                     "Oh no, something broke. Please try sending the magic link again"
@@ -160,7 +160,7 @@ class SignIn extends React.Component {
             >
               <Form.Item
                 name="email"
-                rules={[{ required: true, message: "Please enter your email" }]}
+                rules={[{required: true, message: "Please enter your email"}]}
               >
                 <Input
                   className="Sign-in-form-input"
@@ -216,36 +216,39 @@ class ProfileHome extends React.Component {
     super(props);
     this.state = {
       isLoadingGroups: true,
-      isLoadingSchedule: true,
+      isLoadingReminderOptions: true,
       idToGroup: {},
       reminderPSTHour: null,
     };
     this._idToGroupRef = {};
-    this._reminderPSTHourRef = firebase
+    this._reminderOptionsRef = firebase
       .database()
-      .ref(`/users/${this.props.loginData.uid}/reminder-options/send-pst-hour`);
+      .ref(`/users/${this.props.loginData.uid}/reminder-options`);
+
     this._userGroupIdsRef = firebase
       .database()
       .ref(`/users/${this.props.loginData.uid}/groups`);
     this._inviteFormRefs = {};
   }
   componentDidMount() {
-    this._reminderPSTHourRef.on("value", (snap) => {
+    this._reminderOptionsRef.on("value", (snap) => {
+      const v = snap.val();
       this.setState({
-        isLoadingSchedule: false,
-        reminderPSTHour: snap.val(),
+        isLoadingReminderOptions: false,
+        reminderPSTHour: v["send-pst-hour"],
+        reminderDisabled: v["disabled"]
       });
     });
     // groups
     const updateGroups = (f) => {
-      this.setState(({ idToGroup }) => ({
+      this.setState(({idToGroup}) => ({
         isLoadingGroups: false,
         idToGroup: f(idToGroup),
       }));
     };
 
     const onGroup = (snap) => {
-      updateGroups((oldGroups) => ({ ...oldGroups, [snap.key]: snap.val() }));
+      updateGroups((oldGroups) => ({...oldGroups, [snap.key]: snap.val()}));
     };
 
     const removeStrayGroupIds = (groupIdSet) => {
@@ -268,7 +271,7 @@ class ProfileHome extends React.Component {
     this._userGroupIdsRef.on("value", (snap) => {
       const groupIdSet = new Set(Object.keys(snap.val() || {}));
       if (groupIdSet.size === 0) {
-        this.setState({ isLoadingGroups: false });
+        this.setState({isLoadingGroups: false});
       }
       removeStrayGroupIds(groupIdSet);
       listenToNewGroupIds(groupIdSet);
@@ -279,7 +282,7 @@ class ProfileHome extends React.Component {
       this._idToGroupRef[groupId].off();
       delete this._idToGroupRef[groupId];
       updateGroups((oldGroups) => {
-        const res = { ...oldGroups };
+        const res = {...oldGroups};
         delete res[groupId];
         return res;
       });
@@ -288,26 +291,45 @@ class ProfileHome extends React.Component {
 
   componentWillUnmount() {
     this._userGroupIdsRef.off();
-    this._reminderPSTHourRef.off();
+    this._reminderOptionsRef.off();
     Object.values(this._idToGroupRef).forEach((ref) => ref.off());
   }
 
   render() {
-    const { loginData } = this.props;
+    const {loginData} = this.props;
     const {
       idToGroup,
       isLoadingGroups,
-      isLoadingSchedule,
+      isLoadingReminderOptions,
+      reminderDisabled,
       reminderPSTHour,
     } = this.state;
-    if (isLoadingGroups || isLoadingSchedule) {
+    if (isLoadingGroups || isLoadingReminderOptions) {
       return <FullScreenSpin />;
     }
     const groupEntries = Object.entries(idToGroup || {});
 
     return (
       <div className="Profile-container">
-        {reminderPSTHour != null && (
+        <div className="Profile-schedule-container">
+          <div>
+            <AntSwitch
+              checked={!reminderDisabled}
+              onChange={(checked) => {
+                firebase.database()
+                  .ref(`/users/${this.props.loginData.uid}/reminder-options/disabled`).set(!checked)
+              }}
+            />
+          </div>
+          <p className="Profile-group-invite-user-content" style={{marginTop: "1rem"}}>
+            {
+              reminderDisabled
+                ? "You've disabled reminders. To receive a daily question about your day, simply toggle the switch to the left :)"
+                : "You're set to receive reminders. If you'd like to disable this feature, simply toggle the switch to the left :)"
+            }
+          </p>
+        </div>
+        {!reminderDisabled && reminderPSTHour != null && (
           <div className="Profile-schedule-container">
             <h2 className="Profile-schedule-title">
               Your next reminder:{" "}
@@ -606,7 +628,7 @@ class ProfileHome extends React.Component {
             ref={(x) => {
               this._createGroupForm = x;
             }}
-            onFinish={({ groupName }) => {
+            onFinish={({groupName}) => {
               this._createGroupForm.resetFields();
               const groupKey = firebase.database().ref("/groups/").push().key;
               firebase
@@ -623,7 +645,7 @@ class ProfileHome extends React.Component {
             <Form.Item
               name="groupName"
               rules={[
-                { required: true, message: "Think up a name for your group" },
+                {required: true, message: "Think up a name for your group"},
               ]}
             >
               <Input
@@ -663,11 +685,11 @@ class JournalsComp extends React.Component {
     };
   }
   componentDidMount() {
-    const { loginData } = this.props;
+    const {loginData} = this.props;
     this._levelRef = firebase.database().ref(`/users/${loginData.uid}/level`);
     this._levelRef.on(
       "value",
-      (snap) => this.setState({ isLoadingLevel: false, level: snap.val() }),
+      (snap) => this.setState({isLoadingLevel: false, level: snap.val()}),
       (err) => {
         message.error("Uh oh, we could not access your journals.");
       }
@@ -694,8 +716,8 @@ class JournalsComp extends React.Component {
   }
 
   render() {
-    const { loginData } = this.props;
-    const { isLoadingJournals, isLoadingLevel, journals, level } = this.state;
+    const {loginData} = this.props;
+    const {isLoadingJournals, isLoadingLevel, journals, level} = this.state;
     if (isLoadingJournals) {
       return <FullScreenSpin />;
     }
@@ -818,7 +840,7 @@ class AccountComp extends React.Component {
 
     this._levelRef.on(
       "value",
-      (snap) => this.setState({ isLoading: false, level: snap.val() }),
+      (snap) => this.setState({isLoading: false, level: snap.val()}),
       (err) => {
         message.error("Uh no, failed to fetch your data. Sorry about that :(");
       }
@@ -830,8 +852,8 @@ class AccountComp extends React.Component {
   }
 
   render() {
-    const { loginData } = this.props;
-    const { isLoading, isUpgrading, isExporting, level } = this.state;
+    const {loginData} = this.props;
+    const {isLoading, isUpgrading, isExporting, level} = this.state;
     if (isLoading) {
       return <FullScreenSpin />;
     }
@@ -911,7 +933,7 @@ class AccountComp extends React.Component {
                   type="primary"
                   loading={isUpgrading}
                   onClick={() => {
-                    this.setState({ isUpgrading: true });
+                    this.setState({isUpgrading: true});
                     const sessionPromise = jsonFetch(
                       serverPath("api/me/checkout/create-session"),
                       {
@@ -923,7 +945,7 @@ class AccountComp extends React.Component {
                     );
                     Promise.all([STRIPE_PROMISE, sessionPromise]).then(
                       ([stripe, session]) => {
-                        this.setState({ isUpgrading: false });
+                        this.setState({isUpgrading: false});
                         stripe.redirectToCheckout({
                           sessionId: session["id"],
                         });
@@ -971,14 +993,14 @@ class AccountComp extends React.Component {
             type="default"
             loading={isExporting}
             onClick={(e) => {
-              this.setState({ isExporting: true });
+              this.setState({isExporting: true});
               firebase
                 .database()
                 .ref(`/entries/${loginData.uid}/`)
                 .once(
                   "value",
                   (snap) => {
-                    this.setState({ isExporting: false });
+                    this.setState({isExporting: false});
                     const data = Object.values(snap.val() || {})
                       .sort((x) => new Date(x["date"]))
                       .map((x) => ({
@@ -992,7 +1014,7 @@ class AccountComp extends React.Component {
                     window.location = url;
                   },
                   () => {
-                    this.setState({ isExporting: false });
+                    this.setState({isExporting: false});
                     message.error(
                       "Uh oh, we had trouble exporting your data. Please try again"
                     );
@@ -1077,7 +1099,7 @@ class MeComp extends React.Component {
   }
 
   render() {
-    const { isLoading, loginData } = this.state;
+    const {isLoading, loginData} = this.state;
     if (isLoading) {
       return <FullScreenSpin />;
     }
@@ -1139,12 +1161,12 @@ class MagicAuthComp extends React.Component {
   }
 
   componentDidMount() {
-    const { code } = this.props.match.params;
+    const {code} = this.props.match.params;
     jsonFetch(serverPath("api/magic/auth"), {
       method: "POST",
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({code}),
     })
-      .then(({ token }) => firebase.auth().signInWithCustomToken(token))
+      .then(({token}) => firebase.auth().signInWithCustomToken(token))
       .then(
         () => {
           this.props.history.push("/me");
@@ -1159,7 +1181,7 @@ class MagicAuthComp extends React.Component {
   }
 
   render() {
-    const { isLoading } = this.state;
+    const {isLoading} = this.state;
     if (isLoading) {
       return <FullScreenSpin message="Signing in..." />;
     }
@@ -1169,7 +1191,7 @@ class MagicAuthComp extends React.Component {
 
 const MagicAuth = withRouter(MagicAuthComp);
 
-function HomeComp({ history }) {
+function HomeComp({history}) {
   return (
     <div className="Home">
       <div className="Home-menu">
